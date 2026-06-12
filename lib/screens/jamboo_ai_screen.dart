@@ -13,7 +13,14 @@ class _JambooAIScreenState extends State<JambooAIScreen> {
   final List<Map<String, dynamic>> messages = [
     {
       "text":
-          "👋 Hi! Main Jamboo AI hoon.\n\nMujhe apna mood ya budget batao, main best food recommend karunga.",
+          "👋 Hi! Main Jamboo AI hoon.\n\n"
+          "Mujhe apna mood ya budget batao, main best food recommend karunga.\n\n"
+          "✨ Main kya kar sakta hoon?\n\n"
+          "🍽️ Mood ke hisaab se food recommend karta hoon\n"
+          "💰 Budget ke andar best options dhoondhta hoon\n"
+          "👨‍👩‍👧‍👦 Family aur Party combos suggest karta hoon\n"
+          "⚡ Fast delivery wale restaurants batata hoon\n\n"
+          "👇 Neeche diye gaye Quick Suggestions se shuruaat karein.",
       "isUser": false,
     },
   ];
@@ -36,6 +43,41 @@ class _JambooAIScreenState extends State<JambooAIScreen> {
     _controller.clear();
   }
 
+Widget suggestionChip(String text) {
+  return InkWell(
+    borderRadius: BorderRadius.circular(12),
+    onTap: () {
+      _controller.text = text;
+      sendMessage();
+    },
+    child: Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: 8,
+        vertical: 6,
+      ),
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: const Color(0xFFF3E8FF),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: Colors.deepPurple.shade200,
+        ),
+      ),
+      child: Text(
+        text,
+        textAlign: TextAlign.center,
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          color: Colors.deepPurple,
+        ),
+      ),
+    ),
+  );
+}
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -50,8 +92,8 @@ class _JambooAIScreenState extends State<JambooAIScreen> {
             ClipOval(
               child: Image.asset(
                 "assets/images/jamboo_avatar.png",
-                width: 100,
-                height: 100,
+                width: 105,
+                height: 105,
                 fit: BoxFit.cover,
               ),
             ),
@@ -59,8 +101,8 @@ class _JambooAIScreenState extends State<JambooAIScreen> {
             const Text(
               "Jamboo AI",
               style: TextStyle(
-                fontWeight: FontWeight.bold,
                 fontSize: 22,
+                fontWeight: FontWeight.bold,
               ),
             ),
           ],
@@ -76,19 +118,89 @@ class _JambooAIScreenState extends State<JambooAIScreen> {
               itemBuilder: (context, index) {
                 final msg = messages[index];
 
+                if (index == 0) {
+                  return Column(
+                    crossAxisAlignment:
+                        CrossAxisAlignment.start,
+                    children: [
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Container(
+                          margin: const EdgeInsets.only(
+                            bottom: 12,
+                          ),
+                          padding:
+                              const EdgeInsets.all(14),
+                          constraints:
+                              const BoxConstraints(
+                            maxWidth: 330,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius:
+                                BorderRadius.circular(
+                                    18),
+                          ),
+                          child: Text(
+                            msg["text"],
+                            style: const TextStyle(
+                              fontSize: 15,
+                              color: Colors.black87,
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 12),
+GridView.count(
+                        crossAxisCount: 2,
+                        shrinkWrap: true,
+                        physics:
+                            const NeverScrollableScrollPhysics(),
+                        crossAxisSpacing: 8,
+                        mainAxisSpacing: 8,
+                        childAspectRatio: 4.8,
+                        children: [
+
+                          suggestionChip("💸 Under ₹200"),
+
+                          suggestionChip("🥗 Healthy"),
+
+                          suggestionChip("😋 Tasty & Healthy"),
+
+                          suggestionChip("👨‍👩‍👧‍👦 Family Pack"),
+
+                          suggestionChip("🎉 Party Vibe"),
+
+                          suggestionChip("🎁 Surprise Me"),
+
+                        ],
+                      ),
+
+                      const SizedBox(height: 20),
+                    ],
+                  );
+                }
+
                 return Align(
                   alignment: msg["isUser"]
                       ? Alignment.centerRight
                       : Alignment.centerLeft,
                   child: Container(
-                    margin: const EdgeInsets.only(bottom: 12),
+                    margin: const EdgeInsets.only(
+                      bottom: 12,
+                    ),
                     padding: const EdgeInsets.all(14),
-                    constraints: const BoxConstraints(maxWidth: 280),
+                    constraints:
+                        const BoxConstraints(
+                      maxWidth: 280,
+                    ),
                     decoration: BoxDecoration(
                       color: msg["isUser"]
                           ? Colors.deepPurple
                           : Colors.white,
-                      borderRadius: BorderRadius.circular(18),
+                      borderRadius:
+                          BorderRadius.circular(18),
                     ),
                     child: Text(
                       msg["text"],
@@ -110,16 +222,20 @@ class _JambooAIScreenState extends State<JambooAIScreen> {
             color: Colors.white,
             child: Row(
               children: [
+
                 Expanded(
                   child: TextField(
                     controller: _controller,
                     decoration: InputDecoration(
                       hintText: "Ask Jamboo AI...",
                       filled: true,
-                      fillColor: Colors.grey.shade100,
+                      fillColor:
+                          Colors.grey.shade100,
                       border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(30),
-                        borderSide: BorderSide.none,
+                        borderRadius:
+                            BorderRadius.circular(30),
+                        borderSide:
+                            BorderSide.none,
                       ),
                     ),
                   ),
@@ -128,7 +244,9 @@ class _JambooAIScreenState extends State<JambooAIScreen> {
                 const SizedBox(width: 10),
 
                 CircleAvatar(
-                  backgroundColor: Colors.deepPurple,
+                  radius: 24,
+                  backgroundColor:
+                      Colors.deepPurple,
                   child: IconButton(
                     onPressed: sendMessage,
                     icon: const Icon(
@@ -137,7 +255,7 @@ class _JambooAIScreenState extends State<JambooAIScreen> {
                     ),
                   ),
                 ),
-              ],
+],
             ),
           ),
         ],
