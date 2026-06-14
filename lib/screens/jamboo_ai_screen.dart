@@ -9,7 +9,7 @@ class JambooAIScreen extends StatefulWidget {
 
 class _JambooAIScreenState extends State<JambooAIScreen> {
   final TextEditingController _controller = TextEditingController();
-
+bool isTyping = false;
   final List<Map<String, dynamic>> messages = [
     {
       "text":
@@ -25,7 +25,7 @@ class _JambooAIScreenState extends State<JambooAIScreen> {
     },
   ];
 
-  void sendMessage() {
+  void sendMessage() async {
     if (_controller.text.trim().isEmpty) return;
 
     setState(() {
@@ -34,12 +34,22 @@ class _JambooAIScreenState extends State<JambooAIScreen> {
         "isUser": true,
       });
 
-      messages.add({
-        "text": "🤖 Thanks! Jaldi hi main smart recommendation dunga.",
-        "isUser": false,
-      });
+     
     });
+setState(() {
+  isTyping = true;
+});
 
+await Future.delayed(const Duration(seconds: 2));
+
+setState(() {
+  isTyping = false;
+
+  messages.add({
+    "text": "🤖 Thanks! Jaldi hi main smart recommendation dunga.",
+    "isUser": false,
+  });
+});
     _controller.clear();
   }
 
@@ -139,12 +149,12 @@ Widget suggestionChip(String text) {
                             color: Colors.white,
                             borderRadius:
                                 BorderRadius.circular(
-                                    18),
+                                    15),
                           ),
                           child: Text(
                             msg["text"],
                             style: const TextStyle(
-                              fontSize: 15,
+                              fontSize: 14,
                               color: Colors.black87,
                             ),
                           ),
@@ -152,30 +162,36 @@ Widget suggestionChip(String text) {
                       ),
 
                       const SizedBox(height: 12),
-GridView.count(
-                        crossAxisCount: 2,
-                        shrinkWrap: true,
-                        physics:
-                            const NeverScrollableScrollPhysics(),
-                        crossAxisSpacing: 8,
-                        mainAxisSpacing: 8,
-                        childAspectRatio: 4.8,
-                        children: [
-
-                          suggestionChip("💸 Under ₹200"),
-
-                          suggestionChip("🥗 Healthy"),
-
-                          suggestionChip("😋 Tasty & Healthy"),
-
-                          suggestionChip("👨‍👩‍👧‍👦 Family Pack"),
-
-                          suggestionChip("🎉 Party Vibe"),
-
-                          suggestionChip("🎁 Surprise Me"),
-
-                        ],
-                      ),
+Wrap(
+  spacing: 8,
+  runSpacing: 8,
+  children: [
+    SizedBox(
+      width: MediaQuery.of(context).size.width / 2 - 24,
+      child: suggestionChip("💸 Under ₹200"),
+    ),
+    SizedBox(
+      width: MediaQuery.of(context).size.width / 2 - 24,
+      child: suggestionChip("🥗 Healthy"),
+    ),
+    SizedBox(
+      width: MediaQuery.of(context).size.width / 2 - 24,
+      child: suggestionChip("😋 Tasty & Healthy"),
+    ),
+    SizedBox(
+      width: MediaQuery.of(context).size.width / 2 - 24,
+      child: suggestionChip("👨‍👩‍👧‍👦 Family Pack"),
+    ),
+    SizedBox(
+      width: MediaQuery.of(context).size.width / 2 - 24,
+      child: suggestionChip("🎉 Party Vibe"),
+    ),
+    SizedBox(
+      width: MediaQuery.of(context).size.width / 2 - 24,
+      child: suggestionChip("🎁 Surprise Me"),
+    ),
+  ],
+),
 
                       const SizedBox(height: 20),
                     ],
@@ -216,7 +232,25 @@ GridView.count(
               },
             ),
           ),
-
+if (isTyping)
+  const Padding(
+    padding: EdgeInsets.only(
+      left: 16,
+      right: 16,
+      bottom: 8,
+    ),
+    child: Align(
+      alignment: Alignment.centerLeft,
+      child: Text(
+        "🤖 Jamboo AI is typing...",
+        style: TextStyle(
+          color: Colors.grey,
+          fontSize: 14,
+          fontStyle: FontStyle.italic,
+        ),
+      ),
+    ),
+  ),
           Container(
             padding: const EdgeInsets.all(12),
             color: Colors.white,
