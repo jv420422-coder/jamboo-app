@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-
+import 'cart_screen.dart';
 class RestaurantDetailsScreen extends StatefulWidget {
   const RestaurantDetailsScreen({super.key});
 
@@ -48,7 +48,15 @@ int get totalPrice =>
               ),
 
               ElevatedButton(
-                onPressed: () {},
+                onPressed: () {
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (context) =>
+          const CartScreen(),
+    ),
+  );
+},
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.white,
                   foregroundColor:
