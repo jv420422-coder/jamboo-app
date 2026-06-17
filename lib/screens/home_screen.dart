@@ -9,6 +9,9 @@ import '../widgets/ai_card.dart';
 import '../widgets/bottom_navbar.dart';
 import '../widgets/recommended_card.dart';
 import 'jamboo_ai_screen.dart';
+import 'cart_screen.dart';
+import 'profile_screen.dart';
+import 'under_199_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -280,10 +283,40 @@ if (showAIPopup)
       bottomNavigationBar: BottomNavbar(
         currentIndex: selectedIndex,
         onTap: (index) {
-          setState(() {
-            selectedIndex = index;
-          });
-        },
+  setState(() {
+    selectedIndex = index;
+  });
+
+  if (index == 1) {
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (context) =>
+          const Under199Screen(),
+    ),
+  );
+}
+
+  if (index == 2) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) =>
+            const CartScreen(),
+      ),
+    );
+  }
+
+  if (index == 3) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) =>
+            const ProfileScreen(),
+      ),
+    );
+  }
+},
       ),
     );
   }

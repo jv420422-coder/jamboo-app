@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'home_screen.dart';
 import 'address_screen.dart';
+import 'payment_screen.dart';
 class CartScreen extends StatefulWidget {
   const CartScreen({super.key});
 
@@ -295,7 +296,15 @@ const SizedBox(height: 20),
               width: double.infinity,
               height: 55,
               child: ElevatedButton(
-                onPressed: () {},
+                onPressed: () {
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (context) =>
+          const PaymentScreen(),
+    ),
+  );
+},
                 style: ElevatedButton.styleFrom(
                   backgroundColor:
                       Colors.deepPurple,

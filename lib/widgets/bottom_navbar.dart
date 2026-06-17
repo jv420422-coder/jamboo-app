@@ -24,9 +24,9 @@ class BottomNavbar extends StatelessWidget {
           label: "Home",
         ),
         BottomNavigationBarItem(
-          icon: Icon(Icons.favorite_border),
-          label: "Wishlist",
-        ),
+  icon: Icon(Icons.local_fire_department),
+  label: "Under ₹199",
+),
         BottomNavigationBarItem(
           icon: Icon(Icons.shopping_cart_outlined),
           label: "Cart",

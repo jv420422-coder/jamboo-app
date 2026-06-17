@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-
+import 'payment_screen.dart';
 class AddressScreen extends StatefulWidget {
   const AddressScreen({super.key});
 
@@ -12,6 +12,7 @@ class _AddressScreenState
     extends State<AddressScreen> {
 
   String selectedType = "Home";
+  String selectedAddress = "Home";
 
   @override
   Widget build(BuildContext context) {
@@ -48,6 +49,7 @@ class _AddressScreenState
                 borderRadius:
                     BorderRadius.circular(
                         16),
+                    
               ),
               child: const Row(
                 children: [
@@ -72,54 +74,95 @@ class _AddressScreenState
             ),
             const SizedBox(height: 20),
 
-Container(
-  margin: const EdgeInsets.only(bottom: 12),
-  padding: const EdgeInsets.all(16),
-  decoration: BoxDecoration(
-    color: Colors.white,
-    borderRadius: BorderRadius.circular(16),
-  ),
-  child: const Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Text(
-        "🏠 Home",
-        style: TextStyle(
-          fontWeight: FontWeight.bold,
-        ),
+GestureDetector(
+  onTap: () {
+    setState(() {
+      selectedAddress = "Home";
+    });
+  },
+  child: Container(
+    margin: const EdgeInsets.only(bottom: 12),
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(
+        color: selectedAddress == "Home"
+            ? Colors.deepPurple
+            : Colors.transparent,
+        width: 2,
       ),
-      SizedBox(height: 6),
-      Text("Jatin"),
-      Text("9876543210"),
-      Text("Chauri Chaura, Gorakhpur"),
-    ],
+      boxShadow: const [
+        BoxShadow(
+          color: Colors.black12,
+          blurRadius: 6,
+        ),
+      ],
+    ),
+    child: const Column(
+      crossAxisAlignment:
+          CrossAxisAlignment.start,
+      children: [
+        Text(
+          "🏠 Home",
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        SizedBox(height: 6),
+        Text("Jatin"),
+        Text("9876543210"),
+        Text("Chauri Chaura, Gorakhpur"),
+      ],
+    ),
   ),
 ),
 
-Container(
-  margin: const EdgeInsets.only(bottom: 20),
-  padding: const EdgeInsets.all(16),
-  decoration: BoxDecoration(
-    color: Colors.white,
-    borderRadius: BorderRadius.circular(16),
-  ),
-  child: const Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Text(
-        "🏢 Work",
-        style: TextStyle(
-          fontWeight: FontWeight.bold,
-        ),
+GestureDetector(
+  onTap: () {
+    setState(() {
+      selectedAddress = "Work";
+    });
+  },
+  child: Container(
+    margin: const EdgeInsets.only(bottom: 20),
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(
+        color: selectedAddress == "Work"
+            ? Colors.deepPurple
+            : Colors.transparent,
+        width: 2,
       ),
-      SizedBox(height: 6),
-      Text("Jatin"),
-      Text("9876543210"),
-      Text("Civil Lines, Gorakhpur"),
-    ],
+      boxShadow: const [
+        BoxShadow(
+          color: Colors.black12,
+          blurRadius: 6,
+        ),
+      ],
+    ),
+    child: const Column(
+      crossAxisAlignment:
+          CrossAxisAlignment.start,
+      children: [
+        Text(
+          "🏢 Work",
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        SizedBox(height: 6),
+        Text("Jatin"),
+        Text("9876543210"),
+        Text("Civil Lines, Gorakhpur"),
+      ],
+    ),
   ),
 ),
             const SizedBox(height: 20),
+           
 
             const Text(
               "Full Name",
@@ -233,7 +276,15 @@ Container(
               width: double.infinity,
               height: 55,
               child: ElevatedButton(
-                onPressed: () {},
+                onPressed: () {
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (context) =>
+          const PaymentScreen(),
+    ),
+  );
+},
                 style:
                     ElevatedButton.styleFrom(
                   backgroundColor:
