@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
 import 'cart_screen.dart';
 class RestaurantDetailsScreen extends StatefulWidget {
-  const RestaurantDetailsScreen({super.key});
+  final String restaurantName;
+
+  const RestaurantDetailsScreen({
+    super.key,
+    required this.restaurantName,
+  });
 
   @override
   State<RestaurantDetailsScreen> createState() =>
@@ -131,88 +136,89 @@ int get totalPrice =>
               ],
             ),
 
-            const Padding(
-              padding: EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment:
-                    CrossAxisAlignment.start,
-                children: [
+           Padding(
+  padding: const EdgeInsets.all(20),
+  child: Column(
+    crossAxisAlignment:
+        CrossAxisAlignment.start,
+    children: [
 
-                  Text(
-                    "Pizza Hub",
-                    style: TextStyle(
-                      fontSize: 28,
-                      fontWeight:
-                          FontWeight.bold,
-                    ),
-                  ),
+      Text(
+        widget.restaurantName,
+        style: const TextStyle(
+          fontSize: 28,
+          fontWeight:
+              FontWeight.bold,
+        ),
+      ),
 
-                  SizedBox(height: 10),
+      const SizedBox(height: 10),
 
-                  Row(
-                    children: [
+      const Row(
+        children: [
 
-                      Icon(
-                        Icons.star,
-                        color: Colors.orange,
-                        size: 20,
-                      ),
+          Icon(
+            Icons.star,
+            color: Colors.orange,
+            size: 20,
+          ),
 
-                      SizedBox(width: 5),
+          SizedBox(width: 5),
 
-                      Text(
-                        "4.8",
-                        style: TextStyle(
-                          fontWeight:
-                              FontWeight.bold,
-                        ),
-                      ),
-SizedBox(width: 20),
-
-                      Icon(
-                        Icons.access_time,
-                        size: 18,
-                      ),
-
-                      SizedBox(width: 5),
-
-                      Text("25 min"),
-
-                      SizedBox(width: 20),
-
-                      Icon(
-                        Icons.delivery_dining,
-                        size: 20,
-                      ),
-
-                      SizedBox(width: 5),
-
-                      Text("Free Delivery"),
-                    ],
-                  ),
-
-                  SizedBox(height: 12),
-
-                  Row(
-                    children: [
-
-                      Icon(
-                        Icons.location_on,
-                        color: Colors.red,
-                      ),
-
-                      SizedBox(width: 5),
-
-                      Expanded(
-                        child: Text(
-                          "Chauri Chaura, Gorakhpur",
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+          Text(
+            "4.8",
+            style: TextStyle(
+              fontWeight:
+                  FontWeight.bold,
             ),
+          ),
+
+          SizedBox(width: 20),
+
+          Icon(
+            Icons.access_time,
+            size: 18,
+          ),
+
+          SizedBox(width: 5),
+
+          Text("25 min"),
+
+          SizedBox(width: 20),
+
+          Icon(
+            Icons.delivery_dining,
+            size: 20,
+          ),
+
+          SizedBox(width: 5),
+
+          Text("Free Delivery"),
+        ],
+      ),
+
+      const SizedBox(height: 12),
+
+      const Row(
+        children: [
+
+          Icon(
+            Icons.location_on,
+            color: Colors.red,
+          ),
+
+          SizedBox(width: 5),
+
+          Expanded(
+            child: Text(
+              "Chauri Chaura, Gorakhpur",
+            ),
+          ),
+        ],
+      ),
+    ],
+  ),
+),
 
             Padding(
               padding: const EdgeInsets.symmetric(
@@ -258,29 +264,59 @@ SizedBox(width: 20),
 
             const SizedBox(height: 20),
 
-          foodItem(
-  emoji: "🍕",
-  name: "Cheese Pizza",
-  description: "Classic cheese loaded pizza",
-  price: "₹249",
-  quantity: pizzaQty,
-),
+          if (widget.restaurantName == "Pizza Hub") ...[
 
-foodItem(
-  emoji: "🍔",
-  name: "Veg Burger",
-  description: "Fresh veggie burger",
-  price: "₹149",
-  quantity: burgerQty,
-),
+  foodItem(
+    emoji: "🍕",
+    name: "Cheese Pizza",
+    description: "Classic cheese loaded pizza",
+    price: "₹249",
+    quantity: pizzaQty,
+  ),
 
-foodItem(
-  emoji: "🥤",
-  name: "Cold Coffee",
-  description: "Chilled creamy coffee",
-  price: "₹99",
-  quantity: coffeeQty,
-),
+  foodItem(
+    emoji: "🍔",
+    name: "Veg Burger",
+    description: "Fresh veggie burger",
+    price: "₹149",
+    quantity: burgerQty,
+  ),
+
+  foodItem(
+    emoji: "🥤",
+    name: "Cold Coffee",
+    description: "Chilled creamy coffee",
+    price: "₹99",
+    quantity: coffeeQty,
+  ),
+
+] else ...[
+
+  foodItem(
+    emoji: "🍛",
+    name: "Special Biryani",
+    description: "Signature Dum Biryani",
+    price: "₹299",
+    quantity: pizzaQty,
+  ),
+
+  foodItem(
+    emoji: "🍗",
+    name: "Chicken Biryani",
+    description: "Spicy chicken biryani",
+    price: "₹249",
+    quantity: burgerQty,
+  ),
+
+  foodItem(
+    emoji: "🥤",
+    name: "Cold Drink",
+    description: "Refreshing soft drink",
+    price: "₹49",
+    quantity: coffeeQty,
+  ),
+
+],
 
             const SizedBox(height: 30),
           ],

@@ -23,7 +23,9 @@ class RestaurantCard extends StatelessWidget {
           context,
           MaterialPageRoute(
             builder: (context) =>
-                const RestaurantDetailsScreen(),
+    RestaurantDetailsScreen(
+      restaurantName: name,
+    ),
           ),
         );
       },

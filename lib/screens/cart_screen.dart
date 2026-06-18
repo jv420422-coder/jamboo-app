@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'home_screen.dart';
 import 'address_screen.dart';
 import 'payment_screen.dart';
+import 'offers_coupons_screen.dart';
 class CartScreen extends StatefulWidget {
   const CartScreen({super.key});
 
@@ -241,14 +242,18 @@ Container(
 
       TextButton(
   onPressed: () {
-    setState(() {
-      couponApplied = true;
-    });
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) =>
+            const OffersCouponsScreen(),
+      ),
+    );
   },
   child: Text(
     couponApplied
-        ? "Applied"
-        : "Apply",
+        ? "Change"
+        : "View",
   ),
 ),
     ],

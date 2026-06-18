@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'my_orders_screen.dart';
 import 'help_center_screen.dart';
 import 'jamboo_wallet_screen.dart';
+import 'saved_addresses_screen.dart';
+import 'offers_coupons_screen.dart';
+import 'settings_screen.dart';
+import 'login_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -106,25 +110,34 @@ class ProfileScreen extends StatelessWidget {
             ),
 
             profileTile(
-              context,
-              "❤️",
-              "Favorites",
-              () {},
-            ),
+  context,
+  "📍",
+  "Saved Addresses",
+  () {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) =>
+            const SavedAddressesScreen(),
+      ),
+    );
+  },
+),
 
             profileTile(
-              context,
-              "📍",
-              "Saved Addresses",
-              () {},
-            ),
-
-            profileTile(
-              context,
-              "🎁",
-              "Offers & Coupons",
-              () {},
-            ),
+  context,
+  "🎁",
+  "Offers & Coupons",
+  () {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) =>
+            const OffersCouponsScreen(),
+      ),
+    );
+  },
+),
 
             profileTile(
   context,
@@ -141,19 +154,66 @@ class ProfileScreen extends StatelessWidget {
   },
 ),
 
-            profileTile(
-              context,
-              "⚙️",
-              "Settings",
-              () {},
-            ),
+           profileTile(
+  context,
+  "⚙️",
+  "Settings",
+  () {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) =>
+            const SettingsScreen(),
+      ),
+    );
+  },
+),
 
             profileTile(
-              context,
-              "🚪",
-              "Logout",
-              () {},
+  context,
+  "🚪",
+  "Logout",
+  () {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Logout"),
+        content: const Text(
+          "Are you sure you want to logout?",
+        ),
+        actions: [
+
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+            },
+            child: const Text("Cancel"),
+          ),
+
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(
+                  builder: (context) =>
+                      const LoginScreen(),
+                ),
+                (route) => false,
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor:
+                  Colors.deepPurple,
+              foregroundColor:
+                  Colors.white,
             ),
+            child: const Text("Logout"),
+          ),
+        ],
+      ),
+    );
+  },
+),
           ],
         ),
       ),

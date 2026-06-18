@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../screens/saved_addresses_screen.dart';
 
 class HeaderWidget extends StatelessWidget {
   const HeaderWidget({super.key});
@@ -6,27 +7,50 @@ class HeaderWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+      padding: const EdgeInsets.symmetric(
+        horizontal: 20,
+        vertical: 10,
+      ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: const [
-          Row(
-            children: [
-              Icon(
-                Icons.location_on,
-                color: Color(0xFF7E57C2),
-              ),
-              SizedBox(width: 5),
-              Text(
-                "Lucknow",
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
+        mainAxisAlignment:
+            MainAxisAlignment.spaceBetween,
+        children: [
+
+          GestureDetector(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) =>
+                      const SavedAddressesScreen(),
                 ),
-              ),
-            ],
+              );
+            },
+            child: const Row(
+              children: [
+
+                Icon(
+                  Icons.location_on,
+                  color: Color(0xFF7E57C2),
+                ),
+
+                SizedBox(width: 5),
+
+                Text(
+                  "Chauri Chaura",
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight:
+                        FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
           ),
-          Icon(Icons.notifications_none),
+
+          const Icon(
+            Icons.notifications_none,
+          ),
         ],
       ),
     );
