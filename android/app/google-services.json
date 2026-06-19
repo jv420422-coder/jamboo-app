@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "514105496890",
+    "project_id": "jamboo-ee445",
+    "storage_bucket": "jamboo-ee445.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:514105496890:android:c4058674fdbe65161e2c03",
+        "android_client_info": {
+          "package_name": "com.example.jamboo"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBOvDnUwPF_zRxuUTi4XdW0Xbbn6cKUgzg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
