@@ -103,9 +103,11 @@ class SearchResultsScreen extends StatelessWidget {
                       MaterialPageRoute(
                         builder: (context) =>
                             RestaurantDetailsScreen(
-                          restaurantName:
-                              restaurant,
-                        ),
+  restaurantId: restaurant == "Pizza Hub"
+      ? "pizza_hub"
+      : "biryani_king",
+  restaurantName: restaurant,
+),
                       ),
                     );
                   },

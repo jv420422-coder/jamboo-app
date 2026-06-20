@@ -25,10 +25,13 @@ class RecommendedCard extends StatelessWidget {
           context,
           MaterialPageRoute(
             builder: (context) => RestaurantDetailsScreen(
-              restaurantName: title.contains("Biryani")
-                  ? "Biryani King"
-                  : "Pizza Hub",
-            ),
+  restaurantId: title.contains("Biryani")
+      ? "biryani_king"
+      : "pizza_hub",
+  restaurantName: title.contains("Biryani")
+      ? "Biryani King"
+      : "Pizza Hub",
+),
           ),
         );
       },

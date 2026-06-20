@@ -2,18 +2,20 @@ import 'package:flutter/material.dart';
 import '../screens/restaurant_details_screen.dart';
 
 class RestaurantCard extends StatelessWidget {
-  final String name;
-  final String cuisine;
-  final String rating;
-  final String time;
+  final String restaurantId;
+final String name;
+final String cuisine;
+final String rating;
+final String time;
 
   const RestaurantCard({
-    super.key,
-    required this.name,
-    required this.cuisine,
-    required this.rating,
-    required this.time,
-  });
+  super.key,
+  required this.restaurantId,
+  required this.name,
+  required this.cuisine,
+  required this.rating,
+  required this.time,
+});
 
   @override
   Widget build(BuildContext context) {
@@ -24,8 +26,9 @@ class RestaurantCard extends StatelessWidget {
           MaterialPageRoute(
             builder: (context) =>
     RestaurantDetailsScreen(
-      restaurantName: name,
-    ),
+  restaurantId: restaurantId,
+  restaurantName: name,
+),
           ),
         );
       },

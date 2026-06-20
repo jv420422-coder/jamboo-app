@@ -12,6 +12,7 @@ import 'jamboo_ai_screen.dart';
 import 'cart_screen.dart';
 import 'profile_screen.dart';
 import 'under_199_screen.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -220,19 +221,45 @@ CategoryCard(
                     ),
                   ),
 
-                  const RestaurantCard(
-                    name: "Biryani King",
-                    cuisine: "Biryani • North Indian",
-                    rating: "4.8",
-                    time: "30 min",
-                  ),
+                  StreamBuilder<QuerySnapshot>(
+  stream: FirebaseFirestore.instance
+      .collection('restaurants')
+      .snapshots(),
+  builder: (context, snapshot) {
 
-                  const RestaurantCard(
-                    name: "Pizza Hub",
-                    cuisine: "Pizza • Italian",
-                    rating: "4.7",
-                    time: "25 min",
-                  ),
+    if (snapshot.connectionState ==
+        ConnectionState.waiting) {
+      return const Center(
+        child: CircularProgressIndicator(),
+      );
+    }
+
+    if (!snapshot.hasData ||
+        snapshot.data!.docs.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.all(20),
+        child: Text("No restaurants found"),
+      );
+    }
+
+    return Column(
+      children: snapshot.data!.docs.map((doc) {
+
+        final data =
+            doc.data() as Map<String, dynamic>;
+
+        return RestaurantCard(
+  restaurantId: doc.id,
+  name: data['name'] ?? '',
+  cuisine: data['address'] ?? '',
+  rating: (data['rating'] ?? 0).toString(),
+  time: data['deliveryTime'] ?? '',
+);
+
+      }).toList(),
+    );
+  },
+),
 
                   const SizedBox(height: 80),
                 ],

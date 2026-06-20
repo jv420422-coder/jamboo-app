@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'cart_screen.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 class RestaurantDetailsScreen extends StatefulWidget {
+  final String restaurantId;
   final String restaurantName;
 
   const RestaurantDetailsScreen({
     super.key,
+    required this.restaurantId,
     required this.restaurantName,
   });
 
@@ -264,59 +268,58 @@ int get totalPrice =>
 
             const SizedBox(height: 20),
 
-          if (widget.restaurantName == "Pizza Hub") ...[
+          StreamBuilder<QuerySnapshot>(
+  stream: FirebaseFirestore.instance
+      .collection('menu_items')
+      .where(
+        'restaurantId',
+        isEqualTo: widget.restaurantId,
+      )
+      .snapshots(),
+  builder: (context, snapshot) {
 
-  foodItem(
-    emoji: "🍕",
-    name: "Cheese Pizza",
-    description: "Classic cheese loaded pizza",
-    price: "₹249",
-    quantity: pizzaQty,
-  ),
+    if (snapshot.connectionState ==
+        ConnectionState.waiting) {
+      return const Center(
+        child: CircularProgressIndicator(),
+      );
+    }
 
-  foodItem(
-    emoji: "🍔",
-    name: "Veg Burger",
-    description: "Fresh veggie burger",
-    price: "₹149",
-    quantity: burgerQty,
-  ),
+    if (!snapshot.hasData ||
+        snapshot.data!.docs.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.all(20),
+        child: Text("No menu items found"),
+      );
+    }
 
-  foodItem(
-    emoji: "🥤",
-    name: "Cold Coffee",
-    description: "Chilled creamy coffee",
-    price: "₹99",
-    quantity: coffeeQty,
-  ),
+    return Column(
+      children: snapshot.data!.docs.map((doc) {
 
-] else ...[
+        final data =
+            doc.data() as Map<String, dynamic>;
 
-  foodItem(
-    emoji: "🍛",
-    name: "Special Biryani",
-    description: "Signature Dum Biryani",
-    price: "₹299",
-    quantity: pizzaQty,
-  ),
+        return foodItem(
+          emoji: data['categoryId'] ==
+                  'pizza_category'
+              ? "🍕"
+              : data['categoryId'] ==
+                      'burger_category'
+                  ? "🍔"
+                  : "🍽️",
+          name: data['name'] ?? '',
+          description:
+              data['description'] ??
+                  'Fresh & Delicious',
+          price:
+              "₹${data['price'] ?? 0}",
+          quantity: 0,
+        );
 
-  foodItem(
-    emoji: "🍗",
-    name: "Chicken Biryani",
-    description: "Spicy chicken biryani",
-    price: "₹249",
-    quantity: burgerQty,
-  ),
-
-  foodItem(
-    emoji: "🥤",
-    name: "Cold Drink",
-    description: "Refreshing soft drink",
-    price: "₹49",
-    quantity: coffeeQty,
-  ),
-
-],
+      }).toList(),
+    );
+  },
+),
 
             const SizedBox(height: 30),
           ],
