@@ -12,7 +12,20 @@
           "package_name": "com.example.jamboo"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "514105496890-i7i8fgrdug4piu9tqifrhe20487tolq1.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.jamboo",
+            "certificate_hash": "77861ce8edceb61776eac9d0fa45169996c2a0c3"
+          }
+        },
+        {
+          "client_id": "514105496890-3o6lnsf4vrukhjqf59oe4nfkd0o6g7l9.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyBOvDnUwPF_zRxuUTi4XdW0Xbbn6cKUgzg"
@@ -20,7 +33,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "514105496890-3o6lnsf4vrukhjqf59oe4nfkd0o6g7l9.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "514105496890-bgb83l5rb8df31hsg0ir8q88c76itb2s.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.jamboo"
+              }
+            }
+          ]
         }
       }
     }

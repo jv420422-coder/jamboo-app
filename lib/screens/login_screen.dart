@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'home_screen.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import 'email_auth_screen.dart';
+
 class LoginScreen extends StatelessWidget {
   const LoginScreen({super.key});
 
@@ -46,6 +50,34 @@ class LoginScreen extends StatelessWidget {
       ),
     );
   }
+  Future<void> signInWithGoogle(BuildContext context) async {
+    print("Google button clicked");
+  try {
+    final GoogleSignInAccount? googleUser =
+        await GoogleSignIn().signIn();
+
+    if (googleUser == null) return;
+
+    final GoogleSignInAuthentication googleAuth =
+        await googleUser.authentication;
+
+    final credential = GoogleAuthProvider.credential(
+      accessToken: googleAuth.accessToken,
+      idToken: googleAuth.idToken,
+    );
+
+    await FirebaseAuth.instance.signInWithCredential(credential);
+
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const HomeScreen(),
+      ),
+    );
+  } catch (e) {
+    print(e);
+  }
+}
 
   @override
   Widget build(BuildContext context) {
@@ -121,17 +153,12 @@ class LoginScreen extends StatelessWidget {
                 const SizedBox(height: 40),
 
                 loginButton(
-                  image: "assets/images/google.png",
-                  text: "Continue with Google",
-                  onTap: () {
-  Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (context) => const HomeScreen(),
-    ),
-  );
-},
-                ),
+  image: "assets/images/google.png",
+  text: "Continue with Google",
+  onTap: () {
+    signInWithGoogle(context);
+  },
+),
 
                 const SizedBox(height: 16),
 
@@ -140,11 +167,11 @@ class LoginScreen extends StatelessWidget {
                   text: "Continue with Email",
                   onTap: () {
   Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (context) => const HomeScreen(),
-    ),
-  );
+  context,
+  MaterialPageRoute(
+    builder: (context) => const EmailAuthScreen(),
+  ),
+);
 },
                 ),
 
