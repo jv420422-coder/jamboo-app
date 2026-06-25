@@ -16,6 +16,7 @@ class _EmailAuthScreenState extends State<EmailAuthScreen> {
     bool isLogin = true;
   final emailController = TextEditingController();
   final nameController = TextEditingController();
+  final phoneController = TextEditingController();
   final passwordController = TextEditingController();
   final confirmPasswordController = TextEditingController();
 
@@ -50,6 +51,7 @@ await FirebaseFirestore.instance
     .set({
   'name': nameController.text.trim(),
   'email': user.email,
+  'phone': phoneController.text.trim(),
   'loginMethod': 'email',
   'createdAt': Timestamp.now(),
 });
@@ -137,6 +139,16 @@ print("USER SAVED TO FIRESTORE");
     controller: nameController,
     decoration: const InputDecoration(
       labelText: "Full Name",
+    ),
+  ),
+  const SizedBox(height: 20),
+],
+if (!isLogin) ...[
+  TextField(
+    controller: phoneController,
+    keyboardType: TextInputType.phone,
+    decoration: const InputDecoration(
+      labelText: "Phone Number",
     ),
   ),
   const SizedBox(height: 20),
