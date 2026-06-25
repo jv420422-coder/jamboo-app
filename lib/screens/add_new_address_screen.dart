@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:geocoding/geocoding.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 class AddNewAddressScreen extends StatefulWidget {
 
@@ -34,6 +38,80 @@ class _AddNewAddressScreenState
   bool isSaving = false;
 
   String selectedType = "Home";
+  Future<void> getCurrentLocation() async {
+
+  bool serviceEnabled =
+      await Geolocator.isLocationServiceEnabled();
+
+  if (!serviceEnabled) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text("Please enable Location"),
+      ),
+    );
+    return;
+  }
+
+  LocationPermission permission =
+      await Geolocator.checkPermission();
+
+  if (permission == LocationPermission.denied) {
+    permission =
+        await Geolocator.requestPermission();
+  }
+
+  if (permission == LocationPermission.deniedForever) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text("Location Permission Denied"),
+      ),
+    );
+    return;
+  }
+
+  Position position =
+      await Geolocator.getCurrentPosition();
+
+  try {
+
+  const apiKey = "AIzaSyATVKIrhaNIbGulsfeLEnP5Tzukqnc3m_s";
+
+  final url =
+      "https://maps.googleapis.com/maps/api/geocode/json"
+      "?latlng=${position.latitude},${position.longitude}"
+      "&key=$apiKey";
+
+  final response = await http.get(Uri.parse(url));
+
+  final data = jsonDecode(response.body);
+
+  if (data["status"] == "OK") {
+
+    final result = data["results"][0];
+
+    addressController.text =
+        result["formatted_address"];
+
+  } else {
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+  "${data["status"]}\n${data["error_message"] ?? ""}",
+),
+      ),
+    );
+  }
+
+} catch (e) {
+
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Text(e.toString()),
+    ),
+  );
+}
+}
 
   @override
   void initState() {
@@ -114,7 +192,9 @@ class _AddNewAddressScreenState
           children: [
 
             InkWell(
-              onTap: () {},
+  onTap: () async {
+    await getCurrentLocation();
+  },
               child: Container(
                 width: double.infinity,
                 padding:
