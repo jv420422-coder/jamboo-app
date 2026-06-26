@@ -9,7 +9,7 @@ import '../widgets/ai_card.dart';
 import '../widgets/bottom_navbar.dart';
 import '../widgets/recommended_card.dart';
 import 'jamboo_ai_screen.dart';
-import 'cart_screen.dart';
+import 'cart/cart_screen.dart';
 import 'profile_screen.dart';
 import 'under_199_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';

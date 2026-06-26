@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
-import 'cart_screen.dart';
+import 'cart/cart_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../models/cart_item_model.dart';
+import '../services/cart_service.dart';
 
 class RestaurantDetailsScreen extends StatefulWidget {
   final String restaurantId;
@@ -21,23 +23,33 @@ class _RestaurantDetailsScreenState
     extends State<RestaurantDetailsScreen> {
 
   String selectedFilter = "bestseller";
-int pizzaQty = 0;
-int burgerQty = 0;
-int coffeeQty = 0;
-int get totalItems =>
-    pizzaQty + burgerQty + coffeeQty;
+  final CartService cartService = CartService();
+  Stream<int> get totalItems =>
+    cartService.totalItems();
 
-int get totalPrice =>
-    (pizzaQty * 249) +
-    (burgerQty * 149) +
-    (coffeeQty * 99);
+Stream<double> get totalPrice =>
+    cartService.totalPrice();
   @override
   Widget build(BuildContext context) {
     return Scaffold(
   backgroundColor: const Color(0xFFF5F0FF),
 
-  bottomNavigationBar: totalItems > 0
-      ? Container(
+  bottomNavigationBar: StreamBuilder<int>(
+  stream: totalItems,
+  builder: (context, itemSnapshot) {
+
+    return StreamBuilder<double>(
+      stream: totalPrice,
+      builder: (context, priceSnapshot) {
+
+        final items = itemSnapshot.data ?? 0;
+        final total = priceSnapshot.data ?? 0;
+
+        if (items == 0) {
+          return const SizedBox();
+        }
+
+        return Container(
           padding: const EdgeInsets.all(16),
           decoration: const BoxDecoration(
             color: Colors.deepPurple,
@@ -48,7 +60,7 @@ int get totalPrice =>
             children: [
 
               Text(
-                "🛒 $totalItems Items | ₹$totalPrice",
+                "🛒 $items Items | ₹${total.toStringAsFixed(0)}",
                 style: const TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
@@ -58,27 +70,32 @@ int get totalPrice =>
 
               ElevatedButton(
                 onPressed: () {
-  Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (context) =>
-          const CartScreen(),
-    ),
-  );
-},
+
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          const CartScreen(),
+                    ),
+                  );
+
+                },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.white,
-                  foregroundColor:
-                      Colors.deepPurple,
+                  foregroundColor: Colors.deepPurple,
                 ),
-                child: const Text(
-                  "View Cart",
-                ),
+                child: const Text("View Cart"),
               ),
+
             ],
           ),
-        )
-      : null,
+        );
+
+      },
+    );
+
+  },
+),
 
   body: SingleChildScrollView(
         child: Column(
@@ -313,7 +330,7 @@ int get totalPrice =>
                   'Fresh & Delicious',
           price:
               "₹${data['price'] ?? 0}",
-          quantity: 0,
+          itemId: doc.id,
         );
 
       }).toList(),
@@ -376,8 +393,31 @@ Widget filterChip(
   required String name,
   required String description,
   required String price,
-  required int quantity,
+  required String itemId,
 }) {
+  return StreamBuilder<QuerySnapshot>(
+  stream: cartService.cartStream(),
+  builder: (context, snapshot) {
+
+    int liveQuantity = 0;
+
+    if (snapshot.hasData) {
+
+      for (var cartDoc in snapshot.data!.docs) {
+
+        if (cartDoc.id == itemId) {
+
+          final cartData =
+              cartDoc.data()
+                  as Map<String, dynamic>;
+
+          liveQuantity =
+              cartData["quantity"] ?? 0;
+
+          break;
+        }
+      }
+    }
   return Container(
     margin: const EdgeInsets.symmetric(
       horizontal: 20,
@@ -442,22 +482,31 @@ Widget filterChip(
           ),
         ),
 
-        quantity == 0
+        liveQuantity == 0
             ? ElevatedButton(
-                onPressed: () {
-                  setState(() {
-                    if (name ==
-                        "Cheese Pizza") {
-                      pizzaQty = 1;
-                    } else if (name ==
-                        "Veg Burger") {
-                      burgerQty = 1;
-                    } else if (name ==
-                        "Cold Coffee") {
-                      coffeeQty = 1;
-                    }
-                  });
-                },
+                onPressed: () async {
+
+  final item = CartItemModel(
+  id: itemId,
+    restaurantId: widget.restaurantId,
+    restaurantName: widget.restaurantName,
+    itemName: name,
+    description: description,
+    price: double.parse(
+      price.replaceAll("₹", ""),
+    ),
+    quantity: 1,
+    emoji: emoji,
+  );
+
+  await cartService.addToCart(item);
+
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Text("$name added to cart"),
+    ),
+  );
+},
                 style:
                     ElevatedButton.styleFrom(
                   backgroundColor:
@@ -467,65 +516,42 @@ Widget filterChip(
                 ),
                 child: const Text("Add"),
               )
-            : Row(
-                children: [
+           : Row(
+    children: [
 
-                  IconButton(
-                    onPressed: () {
-                      setState(() {
-                        if (name ==
-                            "Cheese Pizza") {
-                          pizzaQty--;
-                        } else if (name ==
-                            "Veg Burger") {
-                          burgerQty--;
-                        } else if (name ==
-                            "Cold Coffee") {
-                          coffeeQty--;
-                        }
-                      });
-                    },
-                    icon: const Icon(
-                      Icons.remove_circle,
-                      color:
-                          Colors.deepPurple,
-                    ),
-                  ),
+      IconButton(
+        onPressed: () async {
+          await cartService.decreaseQty(itemId);
+        },
+        icon: const Icon(
+          Icons.remove_circle,
+          color: Colors.deepPurple,
+        ),
+      ),
 
-                  Text(
-                    quantity.toString(),
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight:
-                          FontWeight.bold,
-                    ),
-                  ),
+      Text(
+        liveQuantity.toString(),
+        style: const TextStyle(
+          fontSize: 18,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
 
-                  IconButton(
-                    onPressed: () {
-                      setState(() {
-                        if (name ==
-                            "Cheese Pizza") {
-                          pizzaQty++;
-                        } else if (name ==
-                            "Veg Burger") {
-                          burgerQty++;
-                        } else if (name ==
-                            "Cold Coffee") {
-                          coffeeQty++;
-                        }
-                      });
-                    },
-                    icon: const Icon(
-                      Icons.add_circle,
-                      color:
-                          Colors.deepPurple,
-                    ),
-                  ),
-                ],
-              ),
+      IconButton(
+        onPressed: () async {
+          await cartService.increaseQty(itemId);
+        },
+        icon: const Icon(
+          Icons.add_circle,
+          color: Colors.deepPurple,
+        ),
+      ),
+    ],
+  ),
       ],
     ),
   );
+},
+);
 }
     }
