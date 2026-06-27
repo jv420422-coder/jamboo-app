@@ -89,16 +89,13 @@ class OffersCouponsScreen extends StatelessWidget {
             width: double.infinity,
             child: ElevatedButton(
               onPressed: () {
-                ScaffoldMessenger.of(
-                  context,
-                ).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      "$code copied successfully ✅",
-                    ),
-                  ),
-                );
-              },
+
+  Navigator.pop(
+    context,
+    code,
+  );
+
+},
               style:
                   ElevatedButton.styleFrom(
                 backgroundColor:
@@ -107,8 +104,8 @@ class OffersCouponsScreen extends StatelessWidget {
                     Colors.white,
               ),
               child: const Text(
-                "Copy Coupon",
-              ),
+  "Apply",
+),
             ),
           ),
         ],

@@ -5,7 +5,7 @@ import '../../models/cart_item_model.dart';
 import '../../services/cart_service.dart';
 
 import '../home_screen.dart';
-import '../address_screen.dart';
+import '../saved_addresses_screen.dart';
 import '../payment_screen.dart';
 import '../offers_coupons_screen.dart';
 
@@ -26,6 +26,7 @@ class _CartScreenState
       CartService();
 
   bool couponApplied = false;
+  String? appliedCoupon;
 
   @override
   Widget build(BuildContext context) {
@@ -245,12 +246,14 @@ child: Padding(
                               TextButton(
                                 onPressed: () {
                                   Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) =>
-                                          const AddressScreen(),
-                                    ),
-                                  );
+  context,
+  MaterialPageRoute(
+    builder: (_) =>
+        const SavedAddressesScreen(
+          isCheckoutMode: true,
+        ),
+  ),
+);
                                 },
                                 child: const Text(
                                   "Change",
@@ -337,15 +340,24 @@ child: Padding(
                               ),
 
                               TextButton(
-                                onPressed: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) =>
-                                          const OffersCouponsScreen(),
-                                    ),
-                                  );
-                                },
+                                onPressed: () async {
+
+  final result = await Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (_) =>
+          const OffersCouponsScreen(),
+    ),
+  );
+
+  if (result != null) {
+    setState(() {
+      appliedCoupon = result;
+      couponApplied = result == "JAMBOO50";
+    });
+  }
+
+},
                                 child: Text(
                                   couponApplied
                                       ? "Change"

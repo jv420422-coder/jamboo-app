@@ -1,13 +1,31 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'add_new_address_screen.dart';
 
-class SavedAddressesScreen extends StatelessWidget {
-  const SavedAddressesScreen({super.key});
+import 'add_new_address_screen.dart';
+import 'payment_screen.dart';
+
+class SavedAddressesScreen extends StatefulWidget {
+  final bool isCheckoutMode;
+
+  const SavedAddressesScreen({
+    super.key,
+    this.isCheckoutMode = false,
+  });
+
+  @override
+  State<SavedAddressesScreen> createState() =>
+      _SavedAddressesScreenState();
+}
+
+class _SavedAddressesScreenState
+    extends State<SavedAddressesScreen> {
+
+  String? selectedAddressId;
 
   @override
   Widget build(BuildContext context) {
+
     final uid = FirebaseAuth.instance.currentUser!.uid;
 
     return Scaffold(
@@ -32,7 +50,6 @@ class SavedAddressesScreen extends StatelessWidget {
           children: [
 
             Expanded(
-
               child: StreamBuilder<QuerySnapshot>(
 
                 stream: FirebaseFirestore.instance
@@ -61,7 +78,9 @@ class SavedAddressesScreen extends StatelessWidget {
                     return const Center(
                       child: Text(
                         "No Saved Address",
-                        style: TextStyle(fontSize: 18),
+                        style: TextStyle(
+                          fontSize: 18,
+                        ),
                       ),
                     );
                   }
@@ -77,213 +96,259 @@ class SavedAddressesScreen extends StatelessWidget {
                       final data =
                           docs[index].data()
                               as Map<String, dynamic>;
+return GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            selectedAddressId = docs[index].id;
+                          });
+                        },
 
-                      return Container(
+                        child: Container(
+                          margin: const EdgeInsets.only(
+                            bottom: 15,
+                          ),
 
-                        margin:
-                            const EdgeInsets.only(
-                          bottom: 15,
-                        ),
+                          padding: const EdgeInsets.all(16),
 
-                        padding:
-                            const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
 
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius:
-                              BorderRadius.circular(
-                                  16),
-                          boxShadow: const [
-                            BoxShadow(
-                              color: Colors.black12,
-                              blurRadius: 6,
-                            ),
-                          ],
-                        ),
-child: Row(
-  crossAxisAlignment: CrossAxisAlignment.start,
-  children: [
+                            borderRadius:
+                                BorderRadius.circular(16),
 
-    Expanded(
-      child: Column(
-        crossAxisAlignment:
-            CrossAxisAlignment.start,
-        children: [
-
-                            Text(
-                              data["type"] == "Home"
-                                  ? "🏠 Home"
-                                  : data["type"] == "Work"
-                                      ? "🏢 Work"
-                                      : "📍 Other",
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            if (data["isDefault"] == true) ...[
-  const SizedBox(height: 6),
-
-  Container(
-    padding: const EdgeInsets.symmetric(
-      horizontal: 10,
-      vertical: 4,
-    ),
-    decoration: BoxDecoration(
-      color: Colors.green,
-      borderRadius: BorderRadius.circular(20),
-    ),
-    child: const Text(
-      "⭐ DEFAULT",
-      style: TextStyle(
-        color: Colors.white,
-        fontSize: 12,
-        fontWeight: FontWeight.bold,
-      ),
-    ),
-  ),
-
-  const SizedBox(height: 8),
-],
-
-                            const SizedBox(height: 8),
-
-                            Text(
-                              data["name"] ?? "",
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w600,
-                              ),
+                            border: Border.all(
+                              color:
+                                  selectedAddressId ==
+                                          docs[index].id
+                                      ? Colors.deepPurple
+                                      : Colors.transparent,
+                              width: 2,
                             ),
 
-                            const SizedBox(height: 4),
-
-                            Text(data["phone"] ?? ""),
-
-                            const SizedBox(height: 4),
-
-                            Text(data["address"] ?? ""),
-
-                            if ((data["landmark"] ?? "")
-                                .toString()
-                                .isNotEmpty) ...[
-                              const SizedBox(height: 4),
-                              Text(
-                                "Landmark: ${data["landmark"]}",
+                            boxShadow: const [
+                              BoxShadow(
+                                color: Colors.black12,
+                                blurRadius: 6,
                               ),
                             ],
+                          ),
 
-                            const SizedBox(height: 4),
+                          child: Row(
+                            crossAxisAlignment:
+                                CrossAxisAlignment.start,
 
-                            Text(
-                              "${data["city"]}, ${data["state"]} - ${data["pincode"]}",
-                            ),
+                            children: [
+
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment
+                                          .start,
+
+                                  children: [
+
+                                    Text(
+                                      data["type"] ==
+                                              "Home"
+                                          ? "🏠 Home"
+                                          : data["type"] ==
+                                                  "Work"
+                                              ? "🏢 Work"
+                                              : "📍 Other",
+
+                                      style:
+                                          const TextStyle(
+                                        fontSize: 16,
+                                        fontWeight:
+                                            FontWeight.bold,
+                                      ),
+                                    ),
+
+                                    if (data["isDefault"] ==
+                                        true) ...[
+                                      const SizedBox(
+                                          height: 6),
+
+                                      Container(
+                                        padding:
+                                            const EdgeInsets.symmetric(
+                                          horizontal: 10,
+                                          vertical: 4,
+                                        ),
+
+                                        decoration:
+                                            BoxDecoration(
+                                          color:
+                                              Colors.green,
+                                          borderRadius:
+                                              BorderRadius
+                                                  .circular(
+                                                      20),
+                                        ),
+
+                                        child: const Text(
+                                          "⭐ DEFAULT",
+                                          style:
+                                              TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 12,
+                                            fontWeight:
+                                                FontWeight
+                                                    .bold,
+                                          ),
+                                        ),
+                                      ),
+
+                                      const SizedBox(
+                                          height: 8),
+                                    ],
+
+                                    Text(
+                                      data["fullName"] ??
+                                          "",
+                                      style:
+                                          const TextStyle(
+                                        fontWeight:
+                                            FontWeight.w600,
+                                      ),
+                                    ),
+
+                                    const SizedBox(
+                                        height: 4),
+
+                                    Text(
+                                      data["phone"] ??
+                                          "",
+                                    ),
+
+                                    const SizedBox(
+                                        height: 4),
+
+                                    Text(
+                                      data["address"] ??
+                                          "",
+                                    ),
+
+                                    if ((data["landmark"] ??
+                                            "")
+                                        .toString()
+                                        .isNotEmpty) ...[
+                                      const SizedBox(
+                                          height: 4),
+
+                                      Text(
+                                        "Landmark: ${data["landmark"]}",
+                                      ),
+                                    ],
+
+                                    const SizedBox(
+                                        height: 4),
+
+                                    Text(
+                                      "${data["city"]}, ${data["state"]} - ${data["pincode"]}",
+                                    ),
+                                  ],
+                                ),
+                              ),
+
+                              PopupMenuButton<String>(
+                                onSelected:
+                                    (value) async {
+
+                                  if (value ==
+                                      "edit") {
+
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) =>
+                                            AddNewAddressScreen(
+                                          documentId:
+                                              docs[index]
+                                                  .id,
+                                          addressData:
+                                              data,
+                                        ),
+                                      ),
+                                    );
+
+                                    return;
+                                  }
+
+                                  if (value ==
+                                      "default") {
+
+                                    final batch =
+                                        FirebaseFirestore
+                                            .instance
+                                            .batch();
+
+                                    for (final doc
+                                        in docs) {
+                                      batch.update(
+                                        doc.reference,
+                                        {
+                                          "isDefault":
+                                              false,
+                                        },
+                                      );
+                                    }
+
+                                    batch.update(
+                                      docs[index]
+                                          .reference,
+                                      {
+                                        "isDefault":
+                                            true,
+                                      },
+                                    );
+
+                                    await batch.commit();
+
+                                    return;
+                                  }
+
+                                  if (value ==
+                                      "delete") {
+
+                                    await docs[index]
+                                        .reference
+                                        .delete();
+                                  }
+                                },
+
+                                itemBuilder:
+                                    (context) =>
+                                        const [
+
+                                  PopupMenuItem(
+                                    value: "edit",
+                                    child: Text(
+                                        "✏️ Edit"),
+                                  ),
+
+                                  PopupMenuItem(
+                                    value:
+                                        "default",
+                                    child: Text(
+                                        "⭐ Set Default"),
+                                  ),
+
+                                  PopupMenuItem(
+                                    value:
+                                        "delete",
+                                    child: Text(
+                                        "🗑 Delete"),
+                                  ),
+                                ],
+                              ),
                             ],
-      ),
-    ),
-
-    PopupMenuButton<String>(
-      onSelected: (value) async {
-
-if (value == "edit") {
-
-  Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (_) => AddNewAddressScreen(
-        documentId: docs[index].id,
-        addressData: data,
-      ),
-    ),
-  );
-
-  return;
-}
-if (value == "default") {
-
-  final batch = FirebaseFirestore.instance.batch();
-
-  for (final doc in docs) {
-    batch.update(
-      doc.reference,
-      {
-        "isDefault": false,
-      },
-    );
-  }
-
-  batch.update(
-    docs[index].reference,
-    {
-      "isDefault": true,
-    },
-  );
-
-  await batch.commit();
-
-  return;
-}
-        if (value == "delete") {
-
-          final confirm = await showDialog<bool>(
-            context: context,
-            builder: (context) => AlertDialog(
-              title: const Text("Delete Address"),
-              content: const Text(
-                "Are you sure you want to delete this address?",
-              ),
-              actions: [
-
-                TextButton(
-                  onPressed: () {
-                    Navigator.pop(context, false);
-                  },
-                  child: const Text("Cancel"),
-                ),
-
-                ElevatedButton(
-                  onPressed: () {
-                    Navigator.pop(context, true);
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.red,
-                    foregroundColor: Colors.white,
-                  ),
-                  child: const Text("Delete"),
-                ),
-              ],
-            ),
-          );
-
-          if (confirm == true) {
-            await docs[index].reference.delete();
-          }
-        }
-      },
-
-      itemBuilder: (context) => const [
-
-        PopupMenuItem(
-          value: "edit",
-          child: Text("✏️ Edit"),
-        ),
-
-        PopupMenuItem(
-          value: "default",
-          child: Text("⭐ Set Default"),
-        ),
-
-        PopupMenuItem(
-          value: "delete",
-          child: Text("🗑 Delete"),
-        ),
-      ],
-    ),
-                          ],
+                          ),
                         ),
                       );
                     },
                   );
-                },
+},
               ),
             ),
 
@@ -297,7 +362,7 @@ if (value == "default") {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) =>
+                      builder: (_) =>
                           const AddNewAddressScreen(),
                     ),
                   );
@@ -309,12 +374,67 @@ if (value == "default") {
                   "Add New Address",
                 ),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.deepPurple,
-                  foregroundColor: Colors.white,
+                  backgroundColor:
+                      Colors.deepPurple,
+                  foregroundColor:
+                      Colors.white,
                 ),
               ),
             ),
-],
+
+            if (widget.isCheckoutMode) ...[
+
+              const SizedBox(height: 15),
+
+              SizedBox(
+                width: double.infinity,
+                height: 55,
+                child: ElevatedButton(
+                  onPressed: () {
+
+                    if (selectedAddressId == null) {
+
+                      ScaffoldMessenger.of(context)
+                          .showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            "Please select an address",
+                          ),
+                        ),
+                      );
+
+                      return;
+                    }
+
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            const PaymentScreen(),
+                      ),
+                    );
+                  },
+                  style:
+                      ElevatedButton.styleFrom(
+                    backgroundColor:
+                        Colors.deepPurple,
+                    foregroundColor:
+                        Colors.white,
+                  ),
+                  child: const Text(
+                    "Proceed to Payment",
+                    style: TextStyle(
+                      fontWeight:
+                          FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                ),
+              ),
+
+            ],
+
+          ],
         ),
       ),
     );
