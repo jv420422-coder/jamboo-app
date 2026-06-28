@@ -139,6 +139,9 @@ class _AddNewAddressScreenState
 
   final address = widget.addressData!;
 
+  nameController.text = address["fullName"] ?? "";
+  phoneController.text = address["phone"] ?? "";
+
   addressController.text = address["address"] ?? "";
   landmarkController.text = address["landmark"] ?? "";
   cityController.text = address["city"] ?? "";
@@ -420,7 +423,7 @@ SizedBox(
 
              print("SAVE BUTTON CLICKED");
             final addressData = {
-  "name": nameController.text.trim(),
+  "fullName": nameController.text.trim(),
   "phone": phoneController.text.trim(),
   "address": addressController.text.trim(),
   "landmark": landmarkController.text.trim(),
@@ -428,7 +431,9 @@ SizedBox(
   "state": stateController.text.trim(),
   "pincode": pincodeController.text.trim(),
   "type": selectedType,
-  "createdAt": Timestamp.now(),
+
+  if (widget.documentId == null)
+    "createdAt": FieldValue.serverTimestamp(),
 };
 
 if (widget.documentId == null) {

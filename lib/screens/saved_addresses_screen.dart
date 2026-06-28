@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'add_new_address_screen.dart';
 import 'payment_screen.dart';
 
+
 class SavedAddressesScreen extends StatefulWidget {
   final bool isCheckoutMode;
 
@@ -97,11 +98,39 @@ class _SavedAddressesScreenState
                           docs[index].data()
                               as Map<String, dynamic>;
 return GestureDetector(
-                        onTap: () {
-                          setState(() {
-                            selectedAddressId = docs[index].id;
-                          });
-                        },
+                        onTap: () async {
+
+  setState(() {
+    selectedAddressId = docs[index].id;
+  });
+
+  if (widget.isCheckoutMode) {
+
+    final batch = FirebaseFirestore.instance.batch();
+
+    for (final doc in docs) {
+      batch.update(
+        doc.reference,
+        {
+          "selectedForCheckout": false,
+        },
+      );
+    }
+
+    batch.update(
+      docs[index].reference,
+      {
+        "selectedForCheckout": true,
+      },
+    );
+
+    await batch.commit();
+
+    if (context.mounted) {
+      Navigator.pop(context);
+    }
+  }
+},
 
                         child: Container(
                           margin: const EdgeInsets.only(

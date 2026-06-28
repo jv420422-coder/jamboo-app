@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../models/cart_item_model.dart';
 import '../../services/cart_service.dart';
@@ -78,6 +79,7 @@ class _CartScreenState
             10 -
             (couponApplied ? 50 : 0);
 
+          final uid = FirebaseAuth.instance.currentUser!.uid;
         return Scaffold(
 
           backgroundColor:
@@ -182,86 +184,123 @@ child: Padding(
                     child: Column(
                       children: [
 
-                        Container(
-                          margin:
-                              const EdgeInsets.only(
-                            bottom: 16,
-                          ),
-                          padding:
-                              const EdgeInsets.all(
-                            16,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius:
-                                BorderRadius.circular(
-                              16,
-                            ),
-                          ),
-                          child: Row(
-                            children: [
+                        StreamBuilder<QuerySnapshot>(
+  stream: FirebaseFirestore.instance
+      .collection("users")
+      .doc(uid)
+      .collection("addresses")
+      .where("selectedForCheckout", isEqualTo: true)
+      .limit(1)
+      .snapshots(),
 
-                              const Icon(
-                                Icons.location_on,
-                                color:
-                                    Colors.deepPurple,
-                              ),
+  builder: (context, addressSnapshot) {
 
-                              const SizedBox(
-                                width: 10,
-                              ),
+    if (!addressSnapshot.hasData) {
+      return const Center(
+        child: CircularProgressIndicator(),
+      );
+    }
 
-                              const Expanded(
-                                child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment
-                                          .start,
-                                  children: [
+    Map<String, dynamic>? address;
 
-                                    Text(
-                                      "Deliver To",
-                                      style: TextStyle(
-                                        color:
-                                            Colors.grey,
-                                      ),
-                                    ),
+    if (addressSnapshot.data!.docs.isNotEmpty) {
+      address = addressSnapshot
+          .data!.docs
+          .first
+          .data() as Map<String, dynamic>;
+    }
 
-                                    SizedBox(height: 4),
+    return Container(
 
-                                    Text(
-                                      "Jatin",
-                                      style: TextStyle(
-                                        fontWeight:
-                                            FontWeight.bold,
-                                      ),
-                                    ),
+      margin: const EdgeInsets.only(
+        bottom: 16,
+      ),
 
-                                    Text(
-                                      "Chauri Chaura, Gorakhpur",
-                                    ),
-                                  ],
-                                ),
-                              ),
+      padding: const EdgeInsets.all(16),
 
-                              TextButton(
-                                onPressed: () {
-                                  Navigator.push(
-  context,
-  MaterialPageRoute(
-    builder: (_) =>
-        const SavedAddressesScreen(
-          isCheckoutMode: true,
-        ),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius:
+            BorderRadius.circular(16),
+      ),
+
+      child: Row(
+
+        children: [
+
+          const Icon(
+            Icons.location_on,
+            color: Colors.deepPurple,
+          ),
+
+          const SizedBox(width: 10),
+
+          Expanded(
+
+            child: Column(
+
+              crossAxisAlignment:
+                  CrossAxisAlignment.start,
+
+              children: [
+
+                const Text(
+                  "Deliver To",
+                  style: TextStyle(
+                    color: Colors.grey,
+                  ),
+                ),
+
+                const SizedBox(height: 4),
+
+               if (address != null) ...[
+
+  Text(
+    address["fullName"] ?? "",
+    style: const TextStyle(
+      fontWeight: FontWeight.bold,
+    ),
   ),
-);
-                                },
-                                child: const Text(
-                                  "Change",
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
+
+  Text(
+    "${address["address"]}\n${address["city"]}",
+  ),
+
+] else ...[
+
+  const Text(
+    "No Default Address",
+    style: TextStyle(
+      fontWeight: FontWeight.bold,
+    ),
+  ),
+
+],
+              ],
+            ),
+          ),
+
+          TextButton(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) =>
+                      const SavedAddressesScreen(
+                    isCheckoutMode: true,
+                  ),
+                ),
+              );
+            },
+            child: const Text(
+              "Change",
+            ),
+          ),
+        ],
+      ),
+    );
+  },
+),
 
                         ...cartItems.map(
                           (item) => CartItemCard(
