@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 class OrderModel {
   final String orderId;
   final String orderNumber;
@@ -89,10 +91,7 @@ class OrderModel {
       totalAmount:
           (map["totalAmount"] ?? 0)
               .toDouble(),
-      createdAt:
-          DateTime.parse(
-        map["createdAt"],
-      ),
+      createdAt: (map["createdAt"] as Timestamp).toDate(),
     );
   }
 }

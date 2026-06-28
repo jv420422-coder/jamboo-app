@@ -17,17 +17,13 @@ class OrderService {
     });
   }
 
-  Stream<QuerySnapshot> getUserOrders(
-      String userId) {
-    return _firestore
-        .collection("orders")
-        .where("userId", isEqualTo: userId)
-        .orderBy(
-          "createdAt",
-          descending: true,
-        )
-        .snapshots();
-  }
+    Stream<QuerySnapshot> getUserOrders(
+    String userId) {
+
+  return _firestore
+      .collection("orders")
+      .snapshots();
+}
 
   Future<DocumentSnapshot> getOrder(
       String orderId) {

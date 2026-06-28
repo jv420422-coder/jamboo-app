@@ -1,10 +1,31 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:intl/intl.dart';
 
-class MyOrdersScreen extends StatelessWidget {
+import '../services/order_service.dart';
+import '../models/order_model.dart';
+
+class MyOrdersScreen extends StatefulWidget {
   const MyOrdersScreen({super.key});
 
   @override
+  State<MyOrdersScreen> createState() =>
+      _MyOrdersScreenState();
+}
+
+class _MyOrdersScreenState
+    extends State<MyOrdersScreen> {
+
+  final OrderService _orderService =
+      OrderService();
+
+  @override
   Widget build(BuildContext context) {
+
+    final uid =
+        FirebaseAuth.instance.currentUser!.uid;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF5F0FF),
 
@@ -20,52 +41,164 @@ class MyOrdersScreen extends StatelessWidget {
         ),
       ),
 
-      body: ListView(
-        padding: const EdgeInsets.all(20),
-        children: [
+      body: StreamBuilder<QuerySnapshot>(
+        stream: _orderService.getUserOrders(uid),
 
-          orderCard(
-            emoji: "🍕",
-            title: "Cheese Pizza",
-            orderId: "#JB12345",
-            date: "12 Jun 2026",
-            status: "Delivered ✅",
-          ),
+        builder: (context, snapshot) {
 
-          orderCard(
-            emoji: "🍔",
-            title: "Veg Burger",
-            orderId: "#JB12344",
-            date: "10 Jun 2026",
-            status: "Delivered ✅",
-          ),
+          if (snapshot.connectionState ==
+              ConnectionState.waiting) {
 
-          orderCard(
-            emoji: "🍛",
-            title: "Special Biryani",
-            orderId: "#JB12343",
-            date: "08 Jun 2026",
-            status: "Cancelled ❌",
-          ),
-        ],
+            return const Center(
+              child: CircularProgressIndicator(),
+            );
+          }
+
+          if (!snapshot.hasData ||
+              snapshot.data!.docs.isEmpty) {
+
+            return Center(
+              child: Padding(
+                padding:
+                    const EdgeInsets.all(24),
+
+                child: Column(
+                  mainAxisAlignment:
+                      MainAxisAlignment.center,
+
+                  children: [
+
+                    const Text(
+                      "📦",
+                      style: TextStyle(
+                        fontSize: 70,
+                      ),
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    const Text(
+                      "No Orders Yet",
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight:
+                            FontWeight.bold,
+                      ),
+                    ),
+
+                    const SizedBox(height: 10),
+
+                    const Text(
+                      "Looks like you haven't placed any order yet.",
+                      textAlign: TextAlign.center,
+                    ),
+
+                    const SizedBox(height: 30),
+
+                    ElevatedButton(
+                      onPressed: () {
+                        Navigator.pop(context);
+                      },
+                      style:
+                          ElevatedButton.styleFrom(
+                        backgroundColor:
+                            Colors.deepPurple,
+                        foregroundColor:
+                            Colors.white,
+                      ),
+                      child: const Text(
+                        "Browse Food",
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
+
+          final docs = snapshot.data!.docs;
+
+          List<OrderModel> activeOrders = [];
+          List<OrderModel> pastOrders = [];
+
+          for (final doc in docs) {
+
+            final order =
+                OrderModel.fromMap(
+              doc.data()
+                  as Map<String, dynamic>,
+            );
+
+            if (order.orderStatus ==
+                    "Delivered" ||
+                order.orderStatus ==
+                    "Cancelled") {
+
+              pastOrders.add(order);
+
+            } else {
+
+              activeOrders.add(order);
+            }
+          }
+
+          return SingleChildScrollView(
+            padding:
+                const EdgeInsets.all(20),
+
+            child: Column(
+              crossAxisAlignment:
+                  CrossAxisAlignment.start,
+
+              children: [if (activeOrders.isNotEmpty) ...[
+                  const Text(
+                    "ACTIVE ORDERS",
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey,
+                    ),
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  ...activeOrders.map(
+                    (order) => orderCard(order),
+                  ),
+
+                  const SizedBox(height: 24),
+                ],
+
+                if (pastOrders.isNotEmpty) ...[
+                  const Text(
+                    "PAST ORDERS",
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey,
+                    ),
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  ...pastOrders.map(
+                    (order) => orderCard(order),
+                  ),
+                ],
+              ],
+            ),
+          );
+        },
       ),
     );
   }
 
-  Widget orderCard({
-    required String emoji,
-    required String title,
-    required String orderId,
-    required String date,
-    required String status,
-  }) {
+  Widget orderCard(OrderModel order) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
+
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius:
-            BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(18),
         boxShadow: const [
           BoxShadow(
             color: Colors.black12,
@@ -73,97 +206,132 @@ class MyOrdersScreen extends StatelessWidget {
           ),
         ],
       ),
+
       child: Column(
         crossAxisAlignment:
             CrossAxisAlignment.start,
+
         children: [
 
-          Row(
-            children: [
-
-              Text(
-                emoji,
-                style: const TextStyle(
-                  fontSize: 35,
-                ),
-              ),
-
-              const SizedBox(width: 12),
-
-              Expanded(
-                child: Column(
-                  crossAxisAlignment:
-                      CrossAxisAlignment.start,
-                  children: [
-
-                    Text(
-                      title,
-                      style:
-                          const TextStyle(
-                        fontWeight:
-                            FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
-
-                    Text(orderId),
-                  ],
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 12),
-
           Text(
-            "📅 $date",
+            order.restaurantName,
             style: const TextStyle(
-              color: Colors.grey,
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
             ),
           ),
 
           const SizedBox(height: 6),
 
           Text(
-            status,
-            style: const TextStyle(
-              fontWeight:
-                  FontWeight.bold,
-            ),
+            "Order #${order.orderNumber}",
           ),
 
-          const SizedBox(height: 12),
+          const SizedBox(height: 6),
 
-          Row(
-            children: [
+          Text(
+            "${order.items.length} Items • ₹${order.totalAmount.toStringAsFixed(0)}",
+          ),
 
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () {},
-                  child: const Text(
-                    "Track Order",
-                  ),
-                ),
-              ),
+          const SizedBox(height: 6),
 
-              const SizedBox(width: 10),
+          Text(
+            DateFormat(
+              "dd MMM yyyy • hh:mm a",
+            ).format(order.createdAt),
+          ),
 
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: () {},
-                  style:
-                      ElevatedButton.styleFrom(
-                    backgroundColor:
-                        Colors.deepPurple,
-                    foregroundColor:
-                        Colors.white,
-                  ),
-                  child: const Text(
-                    "Reorder",
-                  ),
-                ),
-              ),
-            ],
+          const SizedBox(height: 14),
+
+          Align(
+            alignment: Alignment.centerLeft,
+            child: statusChip(
+              order.orderStatus,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget statusChip(String status) {
+
+    IconData icon;
+    Color color;
+
+    switch (status) {
+
+      case "Pending":
+        icon = Icons.schedule;
+        color = Colors.orange;
+        break;
+
+      case "Accepted":
+        icon = Icons.thumb_up;
+        color = Colors.blue;
+        break;
+
+      case "Preparing":
+        icon = Icons.restaurant;
+        color = Colors.deepPurple;
+        break;
+
+      case "Ready":
+        icon = Icons.inventory;
+        color = Colors.indigo;
+        break;
+
+      case "PickedUp":
+        icon = Icons.delivery_dining;
+        color = Colors.teal;
+        break;
+
+      case "OutForDelivery":
+        icon = Icons.local_shipping;
+        color = Colors.green;
+        break;
+
+      case "Delivered":
+        icon = Icons.check_circle;
+        color = Colors.green;
+        break;
+
+      default:
+        icon = Icons.cancel;
+        color = Colors.red;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: 14,
+        vertical: 8,
+      ),
+
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.12),
+        borderRadius:
+            BorderRadius.circular(30),
+      ),
+
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+
+        children: [
+
+          Icon(
+            icon,
+            size: 18,
+            color: color,
+          ),
+
+          const SizedBox(width: 6),
+
+          Text(
+            status,
+            style: TextStyle(
+              color: color,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ],
       ),
