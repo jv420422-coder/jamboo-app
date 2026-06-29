@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 
 import '../services/order_service.dart';
 import '../models/order_model.dart';
+import 'order_details_screen.dart';
 
 class MyOrdersScreen extends StatefulWidget {
   const MyOrdersScreen({super.key});
@@ -192,7 +193,34 @@ class _MyOrdersScreenState
   }
 
   Widget orderCard(OrderModel order) {
-    return Container(
+    return InkWell(
+  borderRadius: BorderRadius.circular(18),
+
+  onTap: () async {
+
+  final result = await Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (_) => OrderDetailsScreen(
+        order: order,
+      ),
+    ),
+  );
+
+  if (!context.mounted) return;
+
+  if (result == true) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          "Order cancelled successfully",
+        ),
+      ),
+    );
+  }
+},
+
+  child: Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
 
@@ -251,8 +279,9 @@ class _MyOrdersScreenState
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget statusChip(String status) {
 

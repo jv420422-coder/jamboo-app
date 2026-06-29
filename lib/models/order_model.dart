@@ -22,7 +22,11 @@ class OrderModel {
   final double discount;
   final double totalAmount;
 
-  final DateTime createdAt;
+final DateTime createdAt;
+
+final DateTime? updatedAt;
+final DateTime? cancelledAt;
+final String? cancelledBy;
 
   OrderModel({
     required this.orderId,
@@ -39,8 +43,12 @@ class OrderModel {
     required this.deliveryFee,
     required this.discount,
     required this.totalAmount,
-    required this.createdAt,
-  });
+required this.createdAt,
+
+this.updatedAt,
+this.cancelledAt,
+this.cancelledBy,
+});
 
   Map<String, dynamic> toMap() {
     return {
@@ -57,9 +65,14 @@ class OrderModel {
       "subtotal": subtotal,
       "deliveryFee": deliveryFee,
       "discount": discount,
-      "totalAmount": totalAmount,
-      "createdAt": createdAt,
-    };
+"totalAmount": totalAmount,
+"createdAt": createdAt,
+
+"updatedAt": updatedAt,
+"cancelledAt": cancelledAt,
+"cancelledBy": cancelledBy,
+
+};
   }
 
   factory OrderModel.fromMap(Map<String, dynamic> map) {
@@ -87,11 +100,24 @@ class OrderModel {
       deliveryFee:
           (map["deliveryFee"] ?? 0).toDouble(),
       discount:
-          (map["discount"] ?? 0).toDouble(),
-      totalAmount:
-          (map["totalAmount"] ?? 0)
-              .toDouble(),
-      createdAt: (map["createdAt"] as Timestamp).toDate(),
+    (map["discount"] ?? 0).toDouble(),
+
+totalAmount:
+    (map["totalAmount"] ?? 0).toDouble(),
+
+createdAt:
+    (map["createdAt"] as Timestamp).toDate(),
+
+updatedAt: map["updatedAt"] != null
+    ? (map["updatedAt"] as Timestamp).toDate()
+    : null,
+
+cancelledAt: map["cancelledAt"] != null
+    ? (map["cancelledAt"] as Timestamp).toDate()
+    : null,
+
+cancelledBy: map["cancelledBy"],
+
     );
   }
 }
