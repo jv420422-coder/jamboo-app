@@ -21,6 +21,7 @@ class _OrderDetailsScreenState
     extends State<OrderDetailsScreen> {
         final OrderService _orderService = OrderService();
 
+    bool isCancelling = false;
   Color get statusColor {
 
     switch (widget.order.orderStatus) {
