@@ -3,6 +3,9 @@ import 'package:intl/intl.dart';
 
 import '../models/order_model.dart';
 import '../services/order_service.dart';
+import '../services/cart_service.dart';
+import 'cart/cart_screen.dart';
+import '../models/reorder_result.dart';
 
 class OrderDetailsScreen extends StatefulWidget {
   final OrderModel order;
@@ -20,6 +23,8 @@ class OrderDetailsScreen extends StatefulWidget {
 class _OrderDetailsScreenState
     extends State<OrderDetailsScreen> {
         final OrderService _orderService = OrderService();
+        final CartService _cartService = CartService();
+        bool _isReordering = false;
 
     bool isCancelling = false;
   Color get statusColor {
@@ -674,8 +679,8 @@ class _OrderDetailsScreenState
           TextButton(
 
             onPressed: () {
-              Navigator.pop(context);
-            },
+  Navigator.pop(dialogContext);
+}, 
 
             child: const Text("No"),
           ),
@@ -732,6 +737,182 @@ ScaffoldMessenger.of(context).showSnackBar(
   ),
 
   const SizedBox(height: 20),
+
+],
+if (widget.order.orderStatus == "Delivered" ||
+    widget.order.orderStatus == "Cancelled") ...[
+
+  SizedBox(
+    width: double.infinity,
+    height: 55,
+
+    child: ElevatedButton.icon(
+
+      onPressed: () async {
+        if (_isReordering) return;
+
+setState(() {
+  _isReordering = true;
+});
+
+  final result = await _cartService.reorderOrder(
+    restaurantId: widget.order.restaurantId,
+    orderItems: widget.order.items,
+  );
+
+  if (!mounted) return;
+
+  switch (result) {
+
+  case ReorderResult.success:
+
+  ScaffoldMessenger.of(context).showSnackBar(
+    const SnackBar(
+      content: Text(
+        "Previous order added to your cart.",
+      ),
+    ),
+  );
+
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (_) => const CartScreen(),
+    ),
+  );
+
+  break;
+
+  case ReorderResult.differentRestaurant:
+
+  showDialog(
+    context: context,
+    builder: (dialogContext) {
+      return AlertDialog(
+
+        title: const Text(
+          "Replace Cart?",
+        ),
+
+        content: const Text(
+          "Your cart contains items from another restaurant.\n\nDo you want to clear your current cart and reorder this order?",
+        ),
+
+        actions: [
+
+          TextButton(
+            onPressed: () {
+              Navigator.pop(dialogContext);
+            },
+            child: const Text("Cancel"),
+          ),
+
+          ElevatedButton(
+            onPressed: () async {
+
+              Navigator.pop(dialogContext);
+
+              await _cartService.clearCart();
+
+              final result =
+                  await _cartService.reorderOrder(
+                restaurantId:
+                    widget.order.restaurantId,
+                orderItems:
+                    widget.order.items,
+              );
+
+              if (!mounted) return;
+
+              if (result ==
+                  ReorderResult.success) {
+
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) =>
+                        const CartScreen(),
+                  ),
+                );
+
+              } else {
+
+                ScaffoldMessenger.of(context)
+                    .showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      "Reorder failed.",
+                    ),
+                  ),
+                );
+
+              }
+
+            },
+            child: const Text(
+              "Clear Cart",
+            ),
+          ),
+
+        ],
+      );
+    },
+  );
+
+  break;
+
+  case ReorderResult.unavailableItems:
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          "Some items are unavailable.",
+        ),
+      ),
+    );
+    break;
+
+  case ReorderResult.noItemsAvailable:
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          "No items are available.",
+        ),
+      ),
+    );
+    break;
+}
+if (mounted) {
+  setState(() {
+    _isReordering = false;
+  });
+}
+},
+
+      icon: _isReordering
+    ? const SizedBox(
+        width: 18,
+        height: 18,
+        child: CircularProgressIndicator(
+          strokeWidth: 2,
+          color: Colors.white,
+        ),
+      )
+    : const Icon(Icons.refresh),
+
+      label: Text(
+  _isReordering
+      ? "Reordering..."
+      : "Reorder",
+),
+
+      style: ElevatedButton.styleFrom(
+        backgroundColor: Colors.deepPurple,
+        foregroundColor: Colors.white,
+      ),
+    ),
+  ),
 
 ],
 

@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/cart_item_model.dart';
+import '../models/reorder_result.dart';
 
 class CartService {
   final FirebaseFirestore _firestore =
@@ -129,6 +130,7 @@ class CartService {
 
   }
   Future<void> clearCart() async {
+
   final snapshot = await cartRef.get();
 
   final batch = _firestore.batch();
@@ -138,5 +140,113 @@ class CartService {
   }
 
   await batch.commit();
+
+}
+
+Future<void> addOrderItemToCart(
+  CartItemModel item,
+) async {
+
+  final doc = cartRef.doc(item.id);
+
+  final existing = await doc.get();
+
+  if (existing.exists) {
+
+    final data =
+        existing.data() as Map<String, dynamic>;
+
+    await doc.update({
+
+      "quantity":
+          (data["quantity"] ?? 0) +
+          item.quantity,
+
+    });
+
+  } else {
+
+    await doc.set(item.toMap());
+
+  }
+}
+  
+Future<ReorderResult> reorderOrder({
+  required String restaurantId,
+  required List<Map<String, dynamic>> orderItems,
+}) async {
+
+  // Current cart
+  final cartSnapshot = await cartRef.get();
+
+  // Check current restaurant in cart
+  if (cartSnapshot.docs.isNotEmpty) {
+
+    final cartData =
+        cartSnapshot.docs.first.data()
+            as Map<String, dynamic>;
+
+    final currentRestaurantId =
+        cartData["restaurantId"] ?? "";
+
+    if (currentRestaurantId != restaurantId) {
+      return ReorderResult.differentRestaurant;
+    }
+  }
+
+  // Available menu items
+  final List<CartItemModel> availableItems = [];
+
+  for (final item in orderItems) {
+
+    final itemId = item["id"];
+
+    final menuDoc = await FirebaseFirestore.instance
+        .collection("menu_items")
+        .doc(itemId)
+        .get();
+
+    // Item deleted
+    if (!menuDoc.exists) {
+      continue;
+    }
+
+    final menuData =
+        menuDoc.data() as Map<String, dynamic>;
+
+    // Item unavailable
+    if (menuData["isAvailable"] != true) {
+      continue;
+    }
+
+    availableItems.add(
+      CartItemModel(
+        id: itemId,
+        restaurantId: menuData["restaurantId"],
+        restaurantName: item["restaurantName"],
+        itemName: menuData["name"],
+        description: menuData["description"],
+        price:
+            (menuData["price"] as num).toDouble(),
+        quantity: item["quantity"],
+        emoji: menuData["emoji"] ?? "🍽️",
+      ),
+    );
+  }
+
+  // Nothing available
+if (availableItems.isEmpty) {
+  return ReorderResult.noItemsAvailable;
+}
+
+for (final item in availableItems) {
+  await addOrderItemToCart(item);
+}
+
+if (availableItems.length < orderItems.length) {
+  return ReorderResult.unavailableItems;
+}
+
+return ReorderResult.success;
 }
 }
