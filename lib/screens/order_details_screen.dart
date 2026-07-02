@@ -1,11 +1,19 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 
 import '../models/order_model.dart';
-import '../services/order_service.dart';
 import '../services/cart_service.dart';
-import 'cart/cart_screen.dart';
-import '../models/reorder_result.dart';
+import '../services/order_service.dart';
+
+import '../order_details/order_details_status_helper.dart';
+import '../order_details/order_details_action_handler.dart';
+
+import '../order_details/widgets/01_order_header.dart';
+import '../order_details/widgets/02_delivery_timeline.dart';
+import '../order_details/widgets/03_restaurant_info_card.dart';
+import '../order_details/widgets/04_ordered_items_card.dart';
+import '../order_details/widgets/05_delivery_address_card.dart';
+import '../order_details/widgets/06_bill_summary_card.dart';
+import '../order_details/widgets/07_order_action_buttons.dart';
 
 class OrderDetailsScreen extends StatefulWidget {
   final OrderModel order;
@@ -22,165 +30,49 @@ class OrderDetailsScreen extends StatefulWidget {
 
 class _OrderDetailsScreenState
     extends State<OrderDetailsScreen> {
-        final OrderService _orderService = OrderService();
-        final CartService _cartService = CartService();
-        bool _isReordering = false;
+  final OrderService _orderService =
+      OrderService();
 
-    bool isCancelling = false;
-  Color get statusColor {
+  final CartService _cartService =
+      CartService();
 
-    switch (widget.order.orderStatus) {
+  bool _isReordering = false;
 
-      case "Pending":
-        return Colors.orange;
+  Color get statusColor =>
+      OrderDetailsStatusHelper.statusColor(
+        widget.order.orderStatus,
+      );
 
-      case "Accepted":
-        return Colors.blue;
+  String get statusTitle =>
+      OrderDetailsStatusHelper.statusTitle(
+        widget.order.orderStatus,
+      );
 
-      case "Preparing":
-        return Colors.deepPurple;
+  String get statusMessage =>
+      OrderDetailsStatusHelper.statusMessage(
+        widget.order.orderStatus,
+      );
 
-      case "Ready":
-        return Colors.indigo;
+  IconData get statusIcon =>
+      OrderDetailsStatusHelper.statusIcon(
+        widget.order.orderStatus,
+      );
 
-      case "PickedUp":
-        return Colors.teal;
-
-      case "OutForDelivery":
-        return Colors.green;
-
-      case "Delivered":
-        return Colors.green;
-
-      case "Cancelled":
-        return Colors.red;
-
-      default:
-        return Colors.deepPurple;
-    }
-  }
-
-  String get statusTitle {
-
-    switch (widget.order.orderStatus) {
-
-      case "Pending":
-        return "Order Received";
-
-      case "Accepted":
-        return "Restaurant Accepted";
-
-      case "Preparing":
-        return "Preparing Food";
-
-      case "Ready":
-        return "Ready For Pickup";
-
-      case "PickedUp":
-        return "Picked Up";
-
-      case "OutForDelivery":
-        return "On The Way";
-
-      case "Delivered":
-        return "Delivered";
-
-      case "Cancelled":
-        return "Order Cancelled";
-
-      default:
-        return "Processing";
-    }
-  }
-
-  String get statusMessage {
-
-    switch (widget.order.orderStatus) {
-
-      case "Pending":
-        return "Your restaurant has received the order.";
-
-      case "Accepted":
-        return "Restaurant accepted your order.";
-
-      case "Preparing":
-        return "Our chefs are preparing your delicious meal.";
-
-      case "Ready":
-        return "Your order is packed and ready.";
-
-      case "PickedUp":
-        return "Delivery partner picked your order.";
-
-      case "OutForDelivery":
-        return "Your food is almost there.";
-
-      case "Delivered":
-        return "Enjoy your delicious meal.";
-
-      case "Cancelled":
-        return "This order has been cancelled.";
-
-      default:
-        return "";
-    }
-  }
-
-  IconData get statusIcon {
-
-    switch (widget.order.orderStatus) {
-
-      case "Pending":
-        return Icons.receipt_long;
-
-      case "Accepted":
-        return Icons.check_circle;
-
-      case "Preparing":
-        return Icons.restaurant;
-
-      case "Ready":
-        return Icons.inventory;
-
-      case "PickedUp":
-        return Icons.delivery_dining;
-
-      case "OutForDelivery":
-        return Icons.local_shipping;
-
-      case "Delivered":
-        return Icons.celebration;
-
-      case "Cancelled":
-        return Icons.cancel;
-
-      default:
-        return Icons.restaurant;
-    }
-  }
-  bool get canCancelOrder {
-
-  final difference = DateTime.now().difference(
-    widget.order.createdAt,
-  );
-
-  return difference.inMinutes < 2 &&
-      widget.order.orderStatus != "Cancelled";
-}
+  bool get canCancelOrder =>
+      OrderDetailsStatusHelper.canCancelOrder(
+        createdAt: widget.order.createdAt,
+        orderStatus: widget.order.orderStatus,
+      );
 
   @override
   Widget build(BuildContext context) {
-
     return Scaffold(
-
       backgroundColor:
           const Color(0xFFF5F0FF),
 
       appBar: AppBar(
-
         backgroundColor:
             const Color(0xFFF5F0FF),
-
         elevation: 0,
 
         title: const Text(
@@ -193,796 +85,131 @@ class _OrderDetailsScreenState
       ),
 
       body: SingleChildScrollView(
-
         padding:
             const EdgeInsets.all(20),
 
         child: Column(
-
           crossAxisAlignment:
               CrossAxisAlignment.start,
 
           children: [
 
-            Container(
-
-              width: double.infinity,
-
-              padding:
-                  const EdgeInsets.all(22),
-
-              decoration: BoxDecoration(
-
-                color: statusColor,
-
-                borderRadius:
-                    BorderRadius.circular(22),
-
-              ),
-
-              child: Column(
-
-                crossAxisAlignment:
-                    CrossAxisAlignment.start,
-
-                children: [
-
-                  const Text(
-
-                    "🚚 Your Order",
-
-                    style: TextStyle(
-
-                      color: Colors.white70,
-
-                      fontSize: 15,
-
-                    ),
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  Row(
-
-                    children: [
-
-                      Icon(
-
-                        statusIcon,
-
-                        color: Colors.white,
-
-                        size: 34,
-
-                      ),
-
-                      const SizedBox(width: 12),
-
-                      Expanded(
-
-                        child: Text(
-
-                          statusTitle,
-
-                          style: const TextStyle(
-
-                            color: Colors.white,
-
-                            fontSize: 28,
-
-                            fontWeight:
-                                FontWeight.bold,
-
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 12),
-
-                  Text(
-
-                    statusMessage,
-
-                    style: const TextStyle(
-
-                      color: Colors.white70,
-
-                      height: 1.5,
-
-                    ),
-                  ),
-
-                  const SizedBox(height: 24),
-
-                  Container(
-
-                    padding:
-                        const EdgeInsets.symmetric(
-
-                      horizontal: 16,
-
-                      vertical: 12,
-
-                    ),
-
-                    decoration: BoxDecoration(
-
-                      color: Colors.white24,
-
-                      borderRadius:
-                          BorderRadius.circular(
-                        14,
-                      ),
-                    ),
-
-                    child: const Row(
-
-                      children: [
-
-                        Icon(
-
-                          Icons.timer,
-
-                          color: Colors.white,
-
-                        ),
-
-                        SizedBox(width: 10),
-
-                        Text(
-
-                          "Estimated Delivery • 22 mins",
-
-                          style: TextStyle(
-
-                            color: Colors.white,
-
-                            fontWeight:
-                                FontWeight.bold,
-
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+            OrderHeader(
+              statusColor: statusColor,
+              statusIcon: statusIcon,
+              statusTitle: statusTitle,
+              statusMessage: statusMessage,
             ),
 
             const SizedBox(height: 28),
-            // Delivery Journey
 
-            Container(
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(18),
-              ),
+            DeliveryTimeline(
+              statusColor: statusColor,
+              orderStatus:
+                  widget.order.orderStatus,
 
-              child: Column(
-                crossAxisAlignment:
-                    CrossAxisAlignment.start,
-
-                children: [
-
-                  const Text(
-                    "Delivery Journey",
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight:
-                          FontWeight.bold,
-                    ),
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  Row(
-                    children: [
-
-                      journeyStep(
-                        "🏪",
-                        "Placed",
-                        true,
-                      ),
-
-                      Expanded(
-                        child: Divider(
-                          color: statusColor,
-                          thickness: 2,
-                        ),
-                      ),
-
-                      journeyStep(
-                        "👨‍🍳",
-                        "Preparing",
-                        widget.order.orderStatus !=
-                            "Pending",
-                      ),
-
-                      Expanded(
-                        child: Divider(
-                          color: statusColor,
-                          thickness: 2,
-                        ),
-                      ),
-
-                      journeyStep(
-                        "🛵",
-                        "On Way",
-                        widget.order.orderStatus ==
-                                "PickedUp" ||
-                            widget.order.orderStatus ==
-                                "OutForDelivery" ||
-                            widget.order.orderStatus ==
-                                "Delivered",
-                      ),
-
-                      Expanded(
-                        child: Divider(
-                          color: statusColor,
-                          thickness: 2,
-                        ),
-                      ),
-
-                      journeyStep(
-                        "🏠",
-                        "Delivered",
-                        widget.order.orderStatus ==
-                            "Delivered",
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+              journeyStep:
+                  (
+                    emoji,
+                    title,
+                    completed,
+                  ) {
+                return OrderDetailsStatusHelper
+                    .journeyStep(
+                  emoji: emoji,
+                  title: title,
+                  completed: completed,
+                  statusColor: statusColor,
+                );
+              },
             ),
 
             const SizedBox(height: 24),
 
-            // Restaurant Card
-
-            Container(
-              padding: const EdgeInsets.all(18),
-
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius:
-                    BorderRadius.circular(18),
-              ),
-
-              child: Column(
-                crossAxisAlignment:
-                    CrossAxisAlignment.start,
-
-                children: [
-
-                  Text(
-                    widget.order.restaurantName,
-                    style: const TextStyle(
-                      fontSize: 22,
-                      fontWeight:
-                          FontWeight.bold,
-                    ),
-                  ),
-
-                  const SizedBox(height: 10),
-
-                  Row(
-                    children: [
-
-                      const Icon(
-                        Icons.receipt_long,
-                        size: 18,
-                        color: Colors.grey,
-                      ),
-
-                      const SizedBox(width: 8),
-
-                      Text(
-                        "Order #${widget.order.orderNumber}",
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 8),
-
-                  Row(
-                    children: [
-
-                      const Icon(
-                        Icons.schedule,
-                        size: 18,
-                        color: Colors.grey,
-                      ),
-
-                      const SizedBox(width: 8),
-
-                      Text(
-                        DateFormat(
-                          "dd MMM yyyy • hh:mm a",
-                        ).format(
-                          widget.order.createdAt,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+            RestaurantInfoCard(
+              order: widget.order,
             ),
 
             const SizedBox(height: 24),
 
-            // Ordered Items
-
-            Container(
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(18),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-
-                  const Text(
-                    "Ordered Items",
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  ...widget.order.items.map((item) {
-
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: Row(
-                        children: [
-
-                          Expanded(
-                            child: Text(
-                              "${item["itemName"]} × ${item["quantity"]}",
-                            ),
-                          ),
-
-                          Text(
-                            "₹${item["price"]}",
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-
-                        ],
-                      ),
-                    );
-
-                  }).toList(),
-
-                ],
-              ),
+            OrderedItemsCard(
+              order: widget.order,
             ),
 
             const SizedBox(height: 24),
 
-            // Delivery Address
-
-            Container(
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(18),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-
-                  const Text(
-                    "Delivery Address",
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-
-                  const SizedBox(height: 12),
-
-                  Text(
-                    widget.order.deliveryAddress["fullName"] ?? "",
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-
-                  Text(widget.order.deliveryAddress["phone"] ?? ""),
-
-                  const SizedBox(height: 6),
-
-                  Text(
-                    "${widget.order.deliveryAddress["address"]}\n${widget.order.deliveryAddress["city"]}",
-                  ),
-
-                ],
-              ),
+            DeliveryAddressCard(
+              order: widget.order,
             ),
 
             const SizedBox(height: 24),
 
-            // Payment & Bill
-
-            Container(
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(18),
-              ),
-              child: Column(
-                children: [
-
-                  billRow(
-                    "Items Total",
-                    "₹${widget.order.subtotal.toStringAsFixed(0)}",
-                  ),
-
-                  billRow(
-                    "Delivery Fee",
-                    "₹${widget.order.deliveryFee.toStringAsFixed(0)}",
-                  ),
-
-                  billRow(
-                    "Discount",
-                    "-₹${widget.order.discount.toStringAsFixed(0)}",
-                  ),
-
-                  const Divider(),
-
-                  billRow(
-                    "Grand Total",
-                    "₹${widget.order.totalAmount.toStringAsFixed(0)}",
-                    bold: true,
-                  ),
-
-                ],
-              ),
+            BillSummaryCard(
+              order: widget.order,
             ),
 
             const SizedBox(height: 30),
-            if (canCancelOrder) ...[
+            OrderActionButtons(
+              canCancelOrder: canCancelOrder,
 
-  SizedBox(
-    width: double.infinity,
-    height: 55,
+              showRatingButton:
+                  widget.order.orderStatus ==
+                          "Delivered" &&
+                      !widget.order.isRated,
 
-    child: ElevatedButton.icon(
+              showReorderButton:
+                  widget.order.orderStatus ==
+                          "Delivered" ||
+                      widget.order.orderStatus ==
+                          "Cancelled",
 
-      onPressed: () {
+              isReordering: _isReordering,
 
-  showDialog(
-    context: context,
-
-    builder: (dialogContext) {
-
-      return AlertDialog(
-
-        title: const Text(
-          "Cancel Order",
-        ),
-
-        content: const Text(
-          "Are you sure you want to cancel this order?",
-        ),
-
-        actions: [
-
-          TextButton(
-
-            onPressed: () {
-  Navigator.pop(dialogContext);
-}, 
-
-            child: const Text("No"),
-          ),
-
-          ElevatedButton(
-
-            onPressed: () async {
-
-              Navigator.pop(context);
-
-await _orderService.cancelOrder(
-  orderId: widget.order.orderId,
-  cancelledBy: "customer",
-);
-
-if (!mounted) return;
-
-Navigator.pop(context, true);
-
-ScaffoldMessenger.of(context).showSnackBar(
-  const SnackBar(
-    content: Text("Order cancelled successfully"),
-  ),
-);
-
-            },
-
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-            ),
-
-            child: const Text(
-              "Yes, Cancel",
-            ),
-          ),
-        ],
-      );
-    },
-  );
-},
-
-      icon: const Icon(Icons.cancel),
-
-      label: const Text(
-        "Cancel Order",
-      ),
-
-      style: ElevatedButton.styleFrom(
-        backgroundColor: Colors.red,
-        foregroundColor: Colors.white,
-      ),
-    ),
-  ),
-
-  const SizedBox(height: 20),
-
-],
-if (widget.order.orderStatus == "Delivered" ||
-    widget.order.orderStatus == "Cancelled") ...[
-
-  SizedBox(
-    width: double.infinity,
-    height: 55,
-
-    child: ElevatedButton.icon(
-
-      onPressed: () async {
-        if (_isReordering) return;
-
-setState(() {
-  _isReordering = true;
-});
-
-  final result = await _cartService.reorderOrder(
-    restaurantId: widget.order.restaurantId,
-    orderItems: widget.order.items,
-  );
-
-  if (!mounted) return;
-
-  switch (result) {
-
-  case ReorderResult.success:
-
-  ScaffoldMessenger.of(context).showSnackBar(
-    const SnackBar(
-      content: Text(
-        "Previous order added to your cart.",
-      ),
-    ),
-  );
-
-  Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (_) => const CartScreen(),
-    ),
-  );
-
-  break;
-
-  case ReorderResult.differentRestaurant:
-
-  showDialog(
-    context: context,
-    builder: (dialogContext) {
-      return AlertDialog(
-
-        title: const Text(
-          "Replace Cart?",
-        ),
-
-        content: const Text(
-          "Your cart contains items from another restaurant.\n\nDo you want to clear your current cart and reorder this order?",
-        ),
-
-        actions: [
-
-          TextButton(
-            onPressed: () {
-              Navigator.pop(dialogContext);
-            },
-            child: const Text("Cancel"),
-          ),
-
-          ElevatedButton(
-            onPressed: () async {
-
-              Navigator.pop(dialogContext);
-
-              await _cartService.clearCart();
-
-              final result =
-                  await _cartService.reorderOrder(
-                restaurantId:
-                    widget.order.restaurantId,
-                orderItems:
-                    widget.order.items,
-              );
-
-              if (!mounted) return;
-
-              if (result ==
-                  ReorderResult.success) {
-
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) =>
-                        const CartScreen(),
-                  ),
+              onCancel: () async {
+                await OrderDetailsActionHandler.cancelOrder(
+                  context: context,
+                  order: widget.order,
+                  orderService: _orderService,
                 );
+              },
 
-              } else {
-
-                ScaffoldMessenger.of(context)
-                    .showSnackBar(
-                  const SnackBar(
-                    content: Text(
-                      "Reorder failed.",
-                    ),
-                  ),
+              onRate: () async {
+                await OrderDetailsActionHandler
+                    .openRatingScreen(
+                  context: context,
+                  order: widget.order,
                 );
+              },
 
-              }
+              onReorder: () async {
+                await OrderDetailsActionHandler
+                    .reorderOrder(
+                  context: context,
+                  order: widget.order,
+                  cartService: _cartService,
+                  isReordering: _isReordering,
 
-            },
-            child: const Text(
-              "Clear Cart",
+                  startLoading: () {
+                    if (!mounted) return;
+
+                    setState(() {
+                      _isReordering = true;
+                    });
+                  },
+
+                  stopLoading: () {
+                    if (!mounted) return;
+
+                    setState(() {
+                      _isReordering = false;
+                    });
+                  },
+                );
+              },
             ),
-          ),
-
-        ],
-      );
-    },
-  );
-
-  break;
-
-  case ReorderResult.unavailableItems:
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          "Some items are unavailable.",
-        ),
-      ),
-    );
-    break;
-
-  case ReorderResult.noItemsAvailable:
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          "No items are available.",
-        ),
-      ),
-    );
-    break;
-}
-if (mounted) {
-  setState(() {
-    _isReordering = false;
-  });
-}
-},
-
-      icon: _isReordering
-    ? const SizedBox(
-        width: 18,
-        height: 18,
-        child: CircularProgressIndicator(
-          strokeWidth: 2,
-          color: Colors.white,
-        ),
-      )
-    : const Icon(Icons.refresh),
-
-      label: Text(
-  _isReordering
-      ? "Reordering..."
-      : "Reorder",
-),
-
-      style: ElevatedButton.styleFrom(
-        backgroundColor: Colors.deepPurple,
-        foregroundColor: Colors.white,
-      ),
-    ),
-  ),
-
-],
-
           ],
         ),
       ),
-    );
-  }
-
-  Widget billRow(
-    String title,
-    String value, {
-    bool bold = false,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        children: [
-
-          Expanded(
-            child: Text(
-              title,
-              style: TextStyle(
-                fontWeight:
-                    bold ? FontWeight.bold : FontWeight.normal,
-              ),
-            ),
-          ),
-
-          Text(
-            value,
-            style: TextStyle(
-              fontWeight:
-                  bold ? FontWeight.bold : FontWeight.normal,
-            ),
-          ),
-
-        ],
-      ),
-    );
-  }
-
-  Widget journeyStep(
-    String emoji,
-    String title,
-    bool completed,
-  ) {
-    return Column(
-      children: [
-
-        CircleAvatar(
-          radius: 22,
-          backgroundColor:
-              completed
-                  ? statusColor
-                  : Colors.grey.shade300,
-          child: Text(
-            emoji,
-            style: const TextStyle(fontSize: 20),
-          ),
-        ),
-
-        const SizedBox(height: 8),
-
-        Text(
-          title,
-          style: const TextStyle(fontSize: 12),
-        ),
-
-      ],
     );
   }
 }

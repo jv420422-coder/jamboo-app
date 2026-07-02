@@ -93,6 +93,14 @@ class OrderService {
 
   });
 }
+Stream<DocumentSnapshot<Map<String, dynamic>>> watchOrder(
+  String orderId,
+) {
+  return _firestore
+      .collection("orders")
+      .doc(orderId)
+      .snapshots();
+}
 
   Future<void> updatePaymentStatus({
     required String orderId,
