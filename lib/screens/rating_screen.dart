@@ -1,4 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
+import '../models/rating_model.dart';
+import '../services/rating_service.dart';
 
 class RatingScreen extends StatefulWidget {
 
@@ -223,18 +228,46 @@ class _RatingScreenState extends State<RatingScreen> {
                           }
 
                           setState(() {
-                            _isSubmitting = true;
-                          });
+  _isSubmitting = true;
+});
 
-                          await Future.delayed(
-                            const Duration(seconds: 1),
-                          );
+final rating = RatingModel(
+  ratingId:
+      FirebaseFirestore.instance
+          .collection("ratings")
+          .doc()
+          .id,
 
-                          if (!mounted) return;
+  orderId: widget.orderId,
+  orderNumber: widget.orderNumber,
 
-                          setState(() {
-                            _isSubmitting = false;
-                          });
+  restaurantId: widget.restaurantId,
+  restaurantName: widget.restaurantName,
+
+  customerId:
+      FirebaseAuth.instance.currentUser!.uid,
+
+  customerName:
+      FirebaseAuth.instance.currentUser?.displayName ??
+          "Customer",
+
+  rating: _selectedRating.toDouble(),
+
+  review:
+      _reviewController.text.trim(),
+
+  createdAt: DateTime.now(),
+);
+
+await RatingService().submitRating(
+  rating: rating,
+);
+
+if (!mounted) return;
+
+setState(() {
+  _isSubmitting = false;
+});
 
                           showDialog(
 
@@ -258,9 +291,9 @@ class _RatingScreenState extends State<RatingScreen> {
 
                                     onPressed: () {
 
-  Navigator.pop(context);        // Dialog close
+  Navigator.pop(context);          // Dialog close
 
-  Navigator.pop(context, true);  // RatingScreen close + result bhejo
+Navigator.pop(context, "rated"); // RatingScreen close + result bhejo
 
 },
 

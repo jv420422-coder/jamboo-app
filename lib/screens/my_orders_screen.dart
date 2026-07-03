@@ -209,15 +209,25 @@ class _MyOrdersScreenState
 
   if (!context.mounted) return;
 
-  if (result == true) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          "Order cancelled successfully",
-        ),
+  if (result == "cancelled") {
+  ScaffoldMessenger.of(context).showSnackBar(
+    const SnackBar(
+      content: Text(
+        "Order cancelled successfully",
       ),
-    );
-  }
+    ),
+  );
+}
+
+if (result == "rated") {
+  ScaffoldMessenger.of(context).showSnackBar(
+    const SnackBar(
+      content: Text(
+        "Thank you for your valuable feedback ❤️",
+      ),
+    ),
+  );
+}
 },
 
   child: Container(

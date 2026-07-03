@@ -14,6 +14,7 @@ import '../order_details/widgets/04_ordered_items_card.dart';
 import '../order_details/widgets/05_delivery_address_card.dart';
 import '../order_details/widgets/06_bill_summary_card.dart';
 import '../order_details/widgets/07_order_action_buttons.dart';
+import '../order_details/widgets/08_feedback_thank_you_card.dart';
 
 class OrderDetailsScreen extends StatefulWidget {
   final OrderModel order;
@@ -207,6 +208,14 @@ class _OrderDetailsScreenState
                 );
               },
             ),
+           if (widget.order.orderStatus == "Delivered" &&
+    widget.order.isRated) ...[
+  const SizedBox(height: 20),
+
+  const FeedbackThankYouCard(
+    rating: 5,
+  ),
+],
           ],
         ),
       ),

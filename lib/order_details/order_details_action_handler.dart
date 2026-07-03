@@ -55,10 +55,7 @@ class OrderDetailsActionHandler {
 
                 if (!context.mounted) return;
 
-                Navigator.pop(
-                  context,
-                  true,
-                );
+                Navigator.pop(context, "cancelled");
 
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
@@ -91,7 +88,7 @@ class OrderDetailsActionHandler {
     required BuildContext context,
     required OrderModel order,
   }) async {
-    final result = await Navigator.push<bool>(
+    final result = await Navigator.push<String>(
       context,
       MaterialPageRoute(
         builder: (_) => RatingScreen(
@@ -103,12 +100,11 @@ class OrderDetailsActionHandler {
       ),
     );
 
-    if (result == true && context.mounted) {
-      Navigator.pop(
-        context,
-        true,
-      );
-    }
+    if (!context.mounted) return;
+
+if (result == "rated") {
+  Navigator.pop(context, "rated");
+}
   }
   // =========================
   // Reorder
