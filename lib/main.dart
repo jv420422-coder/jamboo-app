@@ -1,9 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'screens/onboarding_screen.dart';
 import 'firebase_options.dart';
 import 'services/fcm_service.dart';
 
+@pragma('vm:entry-point')
+Future<void> firebaseMessagingBackgroundHandler(
+    RemoteMessage message) async {
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+
+  print("Background Notification Received:");
+  print(message.notification?.title);
+}
 Future<void> main() async {
   
   WidgetsFlutterBinding.ensureInitialized();
@@ -11,8 +22,11 @@ Future<void> main() async {
   await Firebase.initializeApp(
   options: DefaultFirebaseOptions.currentPlatform,
 );
+FirebaseMessaging.onBackgroundMessage(
+  firebaseMessagingBackgroundHandler,
+);
 
-await FCMService().initialize();
+await FCMService.initialize();
 
 runApp(const JambooApp());
 }
