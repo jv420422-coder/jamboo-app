@@ -1,21 +1,27 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/order_model.dart';
+import 'order_notification_service.dart';
 
 class OrderService {
   final FirebaseFirestore _firestore =
       FirebaseFirestore.instance;
 
   Future<void> placeOrder(OrderModel order) async {
-    await _firestore
-        .collection("orders")
-        .doc(order.orderId)
-        .set({
-      ...order.toMap(),
+  await _firestore
+      .collection("orders")
+      .doc(order.orderId)
+      .set({
+    ...order.toMap(),
 
-      // Firestore server time
-      "createdAt": FieldValue.serverTimestamp(),
-    });
-  }
+    // Firestore server time
+    "createdAt": FieldValue.serverTimestamp(),
+  });
+
+  await OrderNotificationService.orderPlaced(
+    userId: order.userId,
+    orderId: order.orderId,
+  );
+}
 
     Stream<QuerySnapshot> getUserOrders(String userId) {
   return _firestore
@@ -40,6 +46,17 @@ class OrderService {
   required String orderId,
   required String status,
 }) async {
+  final doc = await _firestore
+      .collection("orders")
+      .doc(orderId)
+      .get();
+
+  if (!doc.exists) {
+    throw Exception("Order not found");
+  }
+
+  final data = doc.data()!;
+
   await _firestore
       .collection("orders")
       .doc(orderId)
@@ -47,6 +64,48 @@ class OrderService {
     "orderStatus": status,
     "updatedAt": FieldValue.serverTimestamp(),
   });
+
+  final String userId = data["userId"];
+
+  switch (status) {
+    case "Accepted":
+      await OrderNotificationService.orderAccepted(
+        userId: userId,
+        orderId: orderId,
+      );
+      break;
+
+    case "Preparing":
+      await OrderNotificationService.preparing(
+        userId: userId,
+        orderId: orderId,
+      );
+      break;
+
+    case "Ready":
+      await OrderNotificationService.ready(
+        userId: userId,
+        orderId: orderId,
+      );
+      break;
+
+    case "OutForDelivery":
+      await OrderNotificationService.outForDelivery(
+        userId: userId,
+        orderId: orderId,
+      );
+      break;
+
+    case "Delivered":
+      await OrderNotificationService.delivered(
+        userId: userId,
+        orderId: orderId,
+      );
+      break;
+
+    default:
+      break;
+  }
 }
   Future<void> cancelOrder({
   required String orderId,
@@ -63,6 +122,7 @@ class OrderService {
   }
 
   final data = doc.data()!;
+  final String userId = data["userId"];
 
   final createdAt =
       (data["createdAt"] as Timestamp).toDate();
@@ -92,6 +152,10 @@ class OrderService {
         FieldValue.serverTimestamp(),
 
   });
+  await OrderNotificationService.cancelled(
+  userId: userId,
+  orderId: orderId,
+);
 }
 Stream<DocumentSnapshot<Map<String, dynamic>>> watchOrder(
   String orderId,

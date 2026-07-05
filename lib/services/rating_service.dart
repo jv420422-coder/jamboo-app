@@ -25,6 +25,7 @@ await _firestore
     .doc(rating.orderId)
     .update({
   "isRated": true,
+  "rating": rating.rating,
 });
 await updateRestaurantRating(
   restaurantId: rating.restaurantId,

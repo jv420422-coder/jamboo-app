@@ -212,9 +212,9 @@ class _OrderDetailsScreenState
     widget.order.isRated) ...[
   const SizedBox(height: 20),
 
-  const FeedbackThankYouCard(
-    rating: 5,
-  ),
+  FeedbackThankYouCard(
+  rating: widget.order.rating.toInt(),
+),
 ],
           ],
         ),

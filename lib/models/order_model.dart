@@ -28,6 +28,7 @@ final DateTime? updatedAt;
 final DateTime? cancelledAt;
 final String? cancelledBy;
 final bool isRated;
+final double rating;
 
   OrderModel({
     required this.orderId,
@@ -50,6 +51,7 @@ this.updatedAt,
 this.cancelledAt,
 this.cancelledBy,
 this.isRated = false,
+this.rating = 0,
 });
 
   Map<String, dynamic> toMap() {
@@ -74,6 +76,7 @@ this.isRated = false,
 "cancelledAt": cancelledAt,
 "cancelledBy": cancelledBy,
 "isRated": isRated,
+"rating": rating,
 
 };
   }
@@ -121,6 +124,7 @@ cancelledAt: map["cancelledAt"] != null
 
 cancelledBy: map["cancelledBy"],
 isRated: map["isRated"] ?? false,
+rating: (map["rating"] ?? 0).toDouble(),
 
     );
   }
