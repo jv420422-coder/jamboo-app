@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'screens/onboarding_screen.dart';
 import 'firebase_options.dart';
+import 'services/fcm_service.dart';
 
 Future<void> main() async {
   
@@ -11,7 +12,9 @@ Future<void> main() async {
   options: DefaultFirebaseOptions.currentPlatform,
 );
 
-  runApp(const JambooApp());
+await FCMService().initialize();
+
+runApp(const JambooApp());
 }
 
 class JambooApp extends StatelessWidget {

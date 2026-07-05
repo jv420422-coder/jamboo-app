@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'home_screen.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 
 class EmailAuthScreen extends StatefulWidget {
   const EmailAuthScreen({super.key});
@@ -45,6 +46,8 @@ class _EmailAuthScreenState extends State<EmailAuthScreen> {
 
 User? user = userCredential.user;
 
+String? token = await FirebaseMessaging.instance.getToken();
+
 await FirebaseFirestore.instance
     .collection('users')
     .doc(user!.uid)
@@ -54,6 +57,8 @@ await FirebaseFirestore.instance
   'phone': phoneController.text.trim(),
   'loginMethod': 'email',
   'createdAt': Timestamp.now(),
+  'lastLogin': Timestamp.now(),
+  'fcmToken': token,
 });
 print("USER SAVED TO FIRESTORE");
 
@@ -80,6 +85,17 @@ print("USER SAVED TO FIRESTORE");
         email: emailController.text.trim(),
         password: passwordController.text.trim(),
       );
+      User? user = FirebaseAuth.instance.currentUser;
+
+String? token = await FirebaseMessaging.instance.getToken();
+
+await FirebaseFirestore.instance
+    .collection('users')
+    .doc(user!.uid)
+    .update({
+  'lastLogin': Timestamp.now(),
+  'fcmToken': token,
+});
 
       Navigator.pushReplacement(
         context,
