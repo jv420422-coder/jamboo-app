@@ -1,22 +1,26 @@
 import 'package:flutter/material.dart';
-import 'order_tracking_screen.dart';
 import 'home_screen.dart';
+import 'order_details_screen.dart';
+import '../models/order_model.dart';
+
 class OrderSuccessScreen extends StatelessWidget {
-  const OrderSuccessScreen({super.key});
+  final OrderModel order;
+
+  const OrderSuccessScreen({
+  super.key,
+  required this.order,
+});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F0FF),
-
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: Column(
-            mainAxisAlignment:
-                MainAxisAlignment.center,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-
               const Text(
                 "🎉",
                 style: TextStyle(
@@ -31,8 +35,7 @@ class OrderSuccessScreen extends StatelessWidget {
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 24,
-                  fontWeight:
-                      FontWeight.bold,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
 
@@ -50,19 +53,15 @@ class OrderSuccessScreen extends StatelessWidget {
               const SizedBox(height: 20),
 
               Container(
-                padding:
-                    const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius:
-                      BorderRadius.circular(
-                          12),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Text(
-                  "Order ID: #JB12345",
-                  style: TextStyle(
-                    fontWeight:
-                        FontWeight.bold,
+                child: Text(
+                  "Order ID: ${order.orderNumber}",
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
               ),
@@ -73,27 +72,24 @@ class OrderSuccessScreen extends StatelessWidget {
                 width: double.infinity,
                 height: 55,
                 child: ElevatedButton(
-                  onPressed: () {
-  Navigator.push(
+                 onPressed: () {
+  Navigator.pushReplacement(
     context,
     MaterialPageRoute(
-      builder: (context) =>
-          const OrderTrackingScreen(),
+      builder: (context) => OrderDetailsScreen(
+        order: order,
+      ),
     ),
   );
 },
-                  style:
-                      ElevatedButton.styleFrom(
-                    backgroundColor:
-                        Colors.deepPurple,
-                    foregroundColor:
-                        Colors.white,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.deepPurple,
+                    foregroundColor: Colors.white,
                   ),
                   child: const Text(
                     "Track Order",
                     style: TextStyle(
-                      fontWeight:
-                          FontWeight.bold,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
                 ),
@@ -106,15 +102,15 @@ class OrderSuccessScreen extends StatelessWidget {
                 height: 55,
                 child: OutlinedButton(
                   onPressed: () {
-  Navigator.pushAndRemoveUntil(
-    context,
-    MaterialPageRoute(
-      builder: (context) =>
-          const HomeScreen(),
-    ),
-    (route) => false,
-  );
-},
+                    Navigator.pushAndRemoveUntil(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) =>
+                            const HomeScreen(),
+                      ),
+                      (route) => false,
+                    );
+                  },
                   child: const Text(
                     "Back to Home",
                   ),

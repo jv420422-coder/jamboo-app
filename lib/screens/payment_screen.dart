@@ -6,10 +6,18 @@ import '../services/cart_service.dart';
 import '../services/order_service.dart';
 import '../models/order_model.dart';
 import 'order_success_screen.dart';
+import '../services/billing_service.dart';
 
 
 class PaymentScreen extends StatefulWidget {
-  const PaymentScreen({super.key});
+  final bool couponApplied;
+  final String? couponCode;
+
+  const PaymentScreen({
+    super.key,
+    required this.couponApplied,
+    this.couponCode,
+  });
 
   @override
   State<PaymentScreen> createState() =>
@@ -29,8 +37,8 @@ class _PaymentScreenState
 
   bool isLoading = false;
 
-  double deliveryFee = 30;
-  double discount = 0;
+ // double deliveryFee = 30;
+ // double discount = 0;
 
   @override
   Widget build(BuildContext context) {
@@ -120,10 +128,11 @@ if (cartDocs.isEmpty) {
                     ((data["quantity"] as int));
               }
 
-              final total =
-                  subtotal +
-                  deliveryFee -
-                  discount;
+              final bill = BillingService.calculateBill(
+  itemsTotal: subtotal,
+  couponApplied: widget.couponApplied,
+  couponCode: widget.couponCode,
+);
 
               return SingleChildScrollView(
                 padding: const EdgeInsets.all(20),
@@ -247,27 +256,30 @@ if (cartDocs.isEmpty) {
                         children: [
 
                           summaryRow(
-                            "Item Total",
-                            subtotal,
-                          ),
+  "Item Total",
+  bill.itemsTotal,
+),
 
-                          summaryRow(
-                            "Delivery Fee",
-                            deliveryFee,
-                          ),
+                         summaryRow(
+  "Delivery Fee",
+  bill.deliveryFee,
+),
 
-                          summaryRow(
-                            "Discount",
-                            -discount,
-                          ),
-
+summaryRow(
+  "Platform Fee",
+  bill.platformFee,
+),
+                         summaryRow(
+  "Discount",
+  -bill.couponDiscount,
+),
                           const Divider(),
 
-                          summaryRow(
-                            "Grand Total",
-                            total,
-                            isBold: true,
-                          ),
+                         summaryRow(
+  "Grand Total",
+  bill.grandTotal,
+  isBold: true,
+),
                         ],
                       ),
                     ),
@@ -330,10 +342,9 @@ const SizedBox(height: 30),
                                     paymentStatus: "Pending",
                                     orderStatus: "Pending",
                                     subtotal: subtotal,
-                                    deliveryFee:
-                                        deliveryFee,
-                                    discount: discount,
-                                    totalAmount: total,
+                                   deliveryFee: bill.deliveryFee,
+discount: bill.couponDiscount,
+totalAmount: bill.grandTotal,
                                     createdAt:
                                         DateTime.now(),
                                   );
@@ -350,8 +361,9 @@ const SizedBox(height: 30),
                                   Navigator.pushReplacement(
                                     context,
                                     MaterialPageRoute(
-                                      builder: (_) =>
-                                          const OrderSuccessScreen(),
+                                      builder: (_) => OrderSuccessScreen(
+  order: order,
+),
                                     ),
                                   );
 

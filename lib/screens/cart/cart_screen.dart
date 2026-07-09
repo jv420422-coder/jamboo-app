@@ -11,6 +11,8 @@ import '../payment_screen.dart';
 import '../offers_coupons_screen.dart';
 
 import 'cart_widgets.dart';
+import '../../services/billing_service.dart';
+import '../../services/checkout_service.dart';
 
 class CartScreen extends StatefulWidget {
   const CartScreen({super.key});
@@ -73,11 +75,11 @@ class _CartScreenState
               item.price * item.quantity;
         }
 
-        double grandTotal =
-            itemsTotal +
-            30 +
-            10 -
-            (couponApplied ? 50 : 0);
+        final bill = BillingService.calculateBill(
+  itemsTotal: itemsTotal,
+  couponApplied: couponApplied,
+  couponCode: appliedCoupon,
+);
 
           final uid = FirebaseAuth.instance.currentUser!.uid;
         return Scaffold(
@@ -393,6 +395,8 @@ child: Padding(
     setState(() {
       appliedCoupon = result;
       couponApplied = result == "JAMBOO50";
+      CheckoutService.instance.appliedCouponCode = appliedCoupon;
+CheckoutService.instance.couponApplied = couponApplied;
     });
   }
 
@@ -412,24 +416,27 @@ const Divider(),
 
                         BillRow(
                           title: "Items Total",
-                          value:
-                              "₹${itemsTotal.toStringAsFixed(0)}",
+                         value:
+    "₹${bill.itemsTotal.toStringAsFixed(0)}",
                         ),
 
                         if (couponApplied)
-                          const BillRow(
+                           BillRow(
                             title: "Coupon Discount",
-                            value: "-₹50",
+                            value:
+    "-₹${bill.couponDiscount.toStringAsFixed(0)}",
                           ),
 
-                        const BillRow(
+                         BillRow(
                           title: "Delivery Fee",
-                          value: "₹30",
+                          value:
+    "₹${bill.deliveryFee.toStringAsFixed(0)}",
                         ),
 
-                        const BillRow(
+                         BillRow(
                           title: "Platform Fee",
-                          value: "₹10",
+                          value:
+    "₹${bill.platformFee.toStringAsFixed(0)}",
                         ),
 
                         const Divider(),
@@ -437,7 +444,7 @@ const Divider(),
                         BillRow(
                           title: "Grand Total",
                           value:
-                              "₹${grandTotal.toStringAsFixed(0)}",
+    "₹${bill.grandTotal.toStringAsFixed(0)}",
                           bold: true,
                         ),
 
@@ -448,13 +455,15 @@ const Divider(),
                           height: 55,
                           child: ElevatedButton(
                             onPressed: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) =>
-                                      const PaymentScreen(),
-                                ),
-                              );
+                             Navigator.push(
+  context,
+  MaterialPageRoute(
+    builder: (_) => PaymentScreen(
+      couponApplied: couponApplied,
+      couponCode: appliedCoupon,
+    ),
+  ),
+);
                             },
                             style:
                                 ElevatedButton.styleFrom(

@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'add_new_address_screen.dart';
 import 'payment_screen.dart';
+import '../services/checkout_service.dart';
 
 
 class SavedAddressesScreen extends StatefulWidget {
@@ -439,7 +440,10 @@ return GestureDetector(
                       context,
                       MaterialPageRoute(
                         builder: (_) =>
-                            const PaymentScreen(),
+                            PaymentScreen(
+  couponApplied: CheckoutService.instance.couponApplied,
+  couponCode: CheckoutService.instance.appliedCouponCode,
+)
                       ),
                     );
                   },

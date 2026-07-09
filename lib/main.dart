@@ -4,6 +4,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'screens/onboarding_screen.dart';
 import 'firebase_options.dart';
 import 'services/fcm_service.dart';
+import 'package:flutter/foundation.dart';
 
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(
@@ -22,11 +23,15 @@ Future<void> main() async {
   await Firebase.initializeApp(
   options: DefaultFirebaseOptions.currentPlatform,
 );
-FirebaseMessaging.onBackgroundMessage(
-  firebaseMessagingBackgroundHandler,
-);
 
-await FCMService.initialize();
+// Sirf Android/iOS ke liye Firebase Messaging initialize hoga
+if (!kIsWeb) {
+  FirebaseMessaging.onBackgroundMessage(
+    firebaseMessagingBackgroundHandler,
+  );
+
+  await FCMService.initialize();
+}
 
 runApp(const JambooApp());
 }
