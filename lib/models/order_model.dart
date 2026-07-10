@@ -19,6 +19,7 @@ class OrderModel {
 
   final double subtotal;
   final double deliveryFee;
+  final double platformFee;
   final double discount;
   final double totalAmount;
 
@@ -29,6 +30,7 @@ final DateTime? cancelledAt;
 final String? cancelledBy;
 final bool isRated;
 final double rating;
+final String? customerNote;
 
   OrderModel({
     required this.orderId,
@@ -43,6 +45,7 @@ final double rating;
     required this.orderStatus,
     required this.subtotal,
     required this.deliveryFee,
+    required this.platformFee,
     required this.discount,
     required this.totalAmount,
 required this.createdAt,
@@ -52,6 +55,7 @@ this.cancelledAt,
 this.cancelledBy,
 this.isRated = false,
 this.rating = 0,
+this.customerNote,
 });
 
   Map<String, dynamic> toMap() {
@@ -68,7 +72,8 @@ this.rating = 0,
       "orderStatus": orderStatus,
       "subtotal": subtotal,
       "deliveryFee": deliveryFee,
-      "discount": discount,
+"platformFee": platformFee,
+"discount": discount,
 "totalAmount": totalAmount,
 "createdAt": createdAt,
 
@@ -77,6 +82,7 @@ this.rating = 0,
 "cancelledBy": cancelledBy,
 "isRated": isRated,
 "rating": rating,
+"customerNote": customerNote,
 
 };
   }
@@ -103,9 +109,13 @@ this.rating = 0,
           map["orderStatus"] ?? "",
       subtotal:
           (map["subtotal"] ?? 0).toDouble(),
-      deliveryFee:
-          (map["deliveryFee"] ?? 0).toDouble(),
-      discount:
+     deliveryFee:
+    (map["deliveryFee"] ?? 0).toDouble(),
+
+platformFee:
+    (map["platformFee"] ?? 0).toDouble(),
+
+discount:
     (map["discount"] ?? 0).toDouble(),
 
 totalAmount:
@@ -125,6 +135,7 @@ cancelledAt: map["cancelledAt"] != null
 cancelledBy: map["cancelledBy"],
 isRated: map["isRated"] ?? false,
 rating: (map["rating"] ?? 0).toDouble(),
+customerNote: map["customerNote"],
 
     );
   }

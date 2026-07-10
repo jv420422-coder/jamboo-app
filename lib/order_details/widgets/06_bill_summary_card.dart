@@ -28,6 +28,10 @@ class BillSummaryCard extends StatelessWidget {
             "Delivery Fee",
             "₹${order.deliveryFee.toStringAsFixed(0)}",
           ),
+          billRow(
+  "Platform Fee",
+  "₹${order.platformFee.toStringAsFixed(0)}",
+),
 
           billRow(
             "Discount",

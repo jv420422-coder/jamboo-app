@@ -177,4 +177,16 @@ Stream<DocumentSnapshot<Map<String, dynamic>>> watchOrder(
       "paymentStatus": status,
     });
   }
+  Future<void> updateCustomerNote({
+  required String orderId,
+  required String note,
+}) async {
+  await _firestore
+      .collection("orders")
+      .doc(orderId)
+      .update({
+    "customerNote": note,
+    "updatedAt": FieldValue.serverTimestamp(),
+  });
+}
 }

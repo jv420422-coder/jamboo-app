@@ -343,6 +343,7 @@ const SizedBox(height: 30),
                                     orderStatus: "Pending",
                                     subtotal: subtotal,
                                    deliveryFee: bill.deliveryFee,
+                                   platformFee: bill.platformFee,
 discount: bill.couponDiscount,
 totalAmount: bill.grandTotal,
                                     createdAt:

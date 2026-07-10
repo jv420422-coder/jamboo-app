@@ -15,6 +15,7 @@ import '../order_details/widgets/05_delivery_address_card.dart';
 import '../order_details/widgets/06_bill_summary_card.dart';
 import '../order_details/widgets/07_order_action_buttons.dart';
 import '../order_details/widgets/08_feedback_thank_you_card.dart';
+import '../order_details/widgets/09_order_contact_actions.dart';
 
 class OrderDetailsScreen extends StatefulWidget {
   final OrderModel order;
@@ -148,6 +149,87 @@ class _OrderDetailsScreenState
             BillSummaryCard(
               order: widget.order,
             ),
+            const SizedBox(height: 20),
+
+OrderContactActions(
+  showRestaurantButton: widget.order.orderStatus != "Picked Up" &&
+      widget.order.orderStatus != "Out for Delivery" &&
+      widget.order.orderStatus != "Delivered",
+
+  showRiderButton: widget.order.orderStatus == "Picked Up" ||
+      widget.order.orderStatus == "Out for Delivery",
+
+  onCallRestaurant: () {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text("Restaurant calling will be added soon"),
+      ),
+    );
+  },
+
+  onCallRider: () {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text("Rider calling will be available after rider assignment"),
+      ),
+    );
+  },
+
+  onLeaveNote: () async {
+  final controller = TextEditingController();
+
+  final note = await showDialog<String>(
+    context: context,
+    builder: (context) {
+      return AlertDialog(
+        title: const Text("Leave a Note"),
+        content: TextField(
+          controller: controller,
+          maxLines: 3,
+          decoration: const InputDecoration(
+            hintText: "Example: Please call before delivery",
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+            },
+            child: const Text("Cancel"),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(
+                context,
+                controller.text.trim(),
+              );
+            },
+            child: const Text("Save"),
+          ),
+        ],
+      );
+    },
+  );
+
+  if (note == null || note.isEmpty) return;
+
+  await _orderService.updateCustomerNote(
+    orderId: widget.order.orderId,
+    note: note,
+  );
+
+  if (!mounted) return;
+
+  ScaffoldMessenger.of(context).showSnackBar(
+    const SnackBar(
+      content: Text("Note saved successfully"),
+    ),
+  );
+},
+),
+
+const SizedBox(height: 20),
 
             const SizedBox(height: 30),
             OrderActionButtons(

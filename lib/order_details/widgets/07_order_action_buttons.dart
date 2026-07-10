@@ -27,10 +27,11 @@ class OrderActionButtons extends StatelessWidget {
       children: [
 
         if (canCancelOrder) ...[
-          SizedBox(
-            width: double.infinity,
-            height: 55,
-            child: ElevatedButton.icon(
+         Center(
+  child: SizedBox(
+    width: MediaQuery.of(context).size.width * 0.75,
+    height: 55,
+    child: ElevatedButton.icon(
               onPressed: onCancel,
               icon: const Icon(Icons.cancel),
               label: const Text("Cancel Order"),
@@ -39,6 +40,7 @@ class OrderActionButtons extends StatelessWidget {
                 foregroundColor: Colors.white,
               ),
             ),
+  ),
           ),
 
           const SizedBox(height: 20),
