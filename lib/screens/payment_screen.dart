@@ -5,18 +5,20 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../services/cart_service.dart';
 import '../services/order_service.dart';
 import '../models/order_model.dart';
-import 'order_success_screen.dart';
+import 'order_details_screen.dart';
 import '../services/billing_service.dart';
-
+import 'saved_addresses_screen.dart';
 
 class PaymentScreen extends StatefulWidget {
   final bool couponApplied;
   final String? couponCode;
+  final double couponDiscount;
 
   const PaymentScreen({
     super.key,
     required this.couponApplied,
     this.couponCode,
+    required this.couponDiscount,
   });
 
   @override
@@ -24,32 +26,198 @@ class PaymentScreen extends StatefulWidget {
       _PaymentScreenState();
 }
 
-class _PaymentScreenState
-    extends State<PaymentScreen> {
+class _PaymentScreenState extends State<PaymentScreen> {
+  final CartService _cartService = CartService();
 
-  final CartService _cartService =
-      CartService();
-
-  final OrderService _orderService =
-      OrderService();
+  final OrderService _orderService = OrderService();
 
   String selectedPayment = "COD";
 
   bool isLoading = false;
 
- // double deliveryFee = 30;
- // double discount = 0;
+  @override
+  void initState() {
+    super.initState();
+    _loadBusinessRules();
+  }
+
+  Future<void> _loadBusinessRules() async {
+    await BillingService.loadBusinessRules();
+
+    if (!mounted) return;
+
+    setState(() {});
+  }
+
+  bool _isValidAddress(Map<String, dynamic>? address) {
+    if (address == null) {
+      return false;
+    }
+
+    final fullName =
+        (address["fullName"] ?? "").toString().trim();
+
+    final phone =
+        (address["phone"] ?? "").toString().trim();
+
+    final fullAddress =
+        (address["address"] ?? "").toString().trim();
+
+    final city =
+        (address["city"] ?? "").toString().trim();
+
+    final state =
+        (address["state"] ?? "").toString().trim();
+
+    final pincode =
+        (address["pincode"] ?? "").toString().trim();
+
+    final latitude =
+        (address["latitude"] as num?)?.toDouble();
+
+    final longitude =
+        (address["longitude"] as num?)?.toDouble();
+
+    return fullName.isNotEmpty &&
+        phone.isNotEmpty &&
+        fullAddress.isNotEmpty &&
+        city.isNotEmpty &&
+        state.isNotEmpty &&
+        pincode.isNotEmpty &&
+        latitude != null &&
+        longitude != null;
+  }
+
+  Future<void> _showAddressRequiredPopup() async {
+    if (!mounted) return;
+
+    await showDialog(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: const Row(
+            children: [
+              Icon(
+                Icons.location_on,
+                color: Colors.deepPurple,
+              ),
+              SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  "Delivery Address Required",
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: const Text(
+            "Please add or select a delivery address before placing your order.",
+            style: TextStyle(
+              fontSize: 15,
+              height: 1.4,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(dialogContext);
+              },
+              child: const Text(
+                "Cancel",
+              ),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.deepPurple,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius:
+                      BorderRadius.circular(10),
+                ),
+              ),
+              onPressed: () {
+                Navigator.pop(dialogContext);
+
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) =>
+                        const SavedAddressesScreen(
+                      isCheckoutMode: true,
+                    ),
+                  ),
+                );
+              },
+              child: const Text(
+                "Add Address",
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<Map<String, dynamic>?> _getSelectedAddress(
+  String uid,
+) async {
+  final snapshot =
+      await FirebaseFirestore.instance
+          .collection("users")
+          .doc(uid)
+          .collection("addresses")
+          .where(
+            "selectedForCheckout",
+            isEqualTo: true,
+          )
+          .limit(1)
+          .get();
+
+  if (snapshot.docs.isEmpty) {
+    return null;
+  }
+
+  final data = snapshot.docs.first.data();
+
+  return {
+    "fullName": data["fullName"] ?? "",
+    "phone": data["phone"] ?? "",
+    "address": data["address"] ?? "",
+    "landmark": data["landmark"] ?? "",
+    "city": data["city"] ?? "",
+    "state": data["state"] ?? "",
+    "pincode": data["pincode"] ?? "",
+    "type": data["type"] ?? "",
+    "latitude": (data["latitude"] ?? 0).toDouble(),
+    "longitude": (data["longitude"] ?? 0).toDouble(),
+  };
+}
 
   @override
   Widget build(BuildContext context) {
+    final currentUser =
+        FirebaseAuth.instance.currentUser;
 
-    final uid =
-        FirebaseAuth.instance.currentUser!.uid;
+    if (currentUser == null) {
+      return const Scaffold(
+        body: Center(
+          child: Text(
+            "Please login to continue.",
+          ),
+        ),
+      );
+    }
+
+    final uid = currentUser.uid;
 
     return Scaffold(
       backgroundColor:
           const Color(0xFFF5F0FF),
-
       appBar: AppBar(
         backgroundColor:
             const Color(0xFFF5F0FF),
@@ -58,54 +226,59 @@ class _PaymentScreenState
           "💳 Payment",
           style: TextStyle(
             color: Colors.black,
-            fontWeight:
-                FontWeight.bold,
+            fontWeight: FontWeight.bold,
           ),
         ),
       ),
-
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
             .collection("users")
             .doc(uid)
             .collection("addresses")
-            .where("selectedForCheckout", isEqualTo: true)
+            .where(
+              "selectedForCheckout",
+              isEqualTo: true,
+            )
             .limit(1)
             .snapshots(),
-
         builder: (context, addressSnapshot) {
-
           if (!addressSnapshot.hasData) {
             return const Center(
-              child:
-                  CircularProgressIndicator(),
+              child: CircularProgressIndicator(),
             );
           }
 
           Map<String, dynamic>? address;
 
-if (addressSnapshot.data!.docs.isNotEmpty) {
-  address = addressSnapshot.data!.docs.first.data()
-      as Map<String, dynamic>;
-}
+          if (addressSnapshot
+              .data!
+              .docs
+              .isNotEmpty) {
+            address =
+                addressSnapshot
+                    .data!
+                    .docs
+                    .first
+                    .data()
+                    as Map<String, dynamic>;
+          }
+
+          final bool hasValidAddress =
+              _isValidAddress(address);
 
           return StreamBuilder<QuerySnapshot>(
-            stream:
-                _cartService.cartStream(),
-
-            builder:
-                (context, cartSnapshot) {
-
+            stream: _cartService.cartStream(),
+            builder: (context, cartSnapshot) {
               if (!cartSnapshot.hasData) {
                 return const Center(
-                  child:
-                      CircularProgressIndicator(),
+                  child: CircularProgressIndicator(),
                 );
               }
 
               final cartDocs =
                   cartSnapshot.data!.docs;
-if (cartDocs.isEmpty) {
+
+              if (cartDocs.isEmpty) {
                 return const Center(
                   child: Text(
                     "Your cart is empty",
@@ -121,85 +294,142 @@ if (cartDocs.isEmpty) {
 
               for (final doc in cartDocs) {
                 final data =
-                    doc.data() as Map<String, dynamic>;
+                    doc.data()
+                        as Map<String, dynamic>;
 
                 subtotal +=
-                    ((data["price"] as num).toDouble()) *
-                    ((data["quantity"] as int));
+                    ((data["price"] as num)
+                            .toDouble()) *
+                        ((data["quantity"] as num)
+                            .toInt());
               }
 
-              final bill = BillingService.calculateBill(
-  itemsTotal: subtotal,
-  couponApplied: widget.couponApplied,
-  couponCode: widget.couponCode,
-);
+              final bill =
+                  BillingService.calculateBill(
+                itemsTotal: subtotal,
+                couponDiscount:
+                    widget.couponApplied
+                        ? widget.couponDiscount
+                        : 0,
+                couponCode: widget.couponCode,
+              );
 
               return SingleChildScrollView(
-                padding: const EdgeInsets.all(20),
-
+                padding:
+                    const EdgeInsets.all(20),
                 child: Column(
                   crossAxisAlignment:
                       CrossAxisAlignment.start,
-
                   children: [
-
                     Container(
                       width: double.infinity,
                       padding:
                           const EdgeInsets.all(16),
-
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius:
                             BorderRadius.circular(16),
                       ),
-
                       child: Column(
                         crossAxisAlignment:
                             CrossAxisAlignment.start,
-
                         children: [
-
-                          const Text(
-                            "📍 Deliver To",
-                            style: TextStyle(
-                              fontWeight:
-                                  FontWeight.bold,
-                              fontSize: 16,
-                            ),
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.location_on,
+                                color:
+                                    hasValidAddress
+                                        ? Colors
+                                            .deepPurple
+                                        : Colors
+                                            .redAccent,
+                              ),
+                              const SizedBox(
+                                width: 8,
+                              ),
+                              const Text(
+                                "Deliver To",
+                                style: TextStyle(
+                                  fontWeight:
+                                      FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
+                            ],
                           ),
 
                           const SizedBox(height: 10),
 
-                          if (address != null) ...[
-
+                          if (hasValidAddress) ...[
                             Text(
-                              address["fullName"] ?? "",
-                              style: const TextStyle(
+                              address!["fullName"]
+                                      ?.toString() ??
+                                  "",
+                              style:
+                                  const TextStyle(
                                 fontWeight:
                                     FontWeight.bold,
                               ),
                             ),
-
                             Text(
-                              address["phone"] ?? "",
+                              address["phone"]
+                                      ?.toString() ??
+                                  "",
                             ),
-
-                            const SizedBox(height: 5),
-
+                            const SizedBox(
+                              height: 5,
+                            ),
                             Text(
-                              address["address"] ?? "",
+                              address["address"]
+                                      ?.toString() ??
+                                  "",
                             ),
-
                             Text(
-                              "${address["city"]}, ${address["state"]} - ${address["pincode"]}",
+                              "${address["city"]}, "
+                              "${address["state"]} - "
+                              "${address["pincode"]}",
                             ),
-
-                          ] else
-
+                          ] else ...[
                             const Text(
-                              "No default address selected",
+                              "No delivery address selected",
+                              style: TextStyle(
+                                color:
+                                    Colors.redAccent,
+                                fontWeight:
+                                    FontWeight.bold,
+                              ),
                             ),
+                            const SizedBox(
+                              height: 6,
+                            ),
+                            const Text(
+                              "Please add a delivery address to place your order.",
+                              style: TextStyle(
+                                color: Colors.grey,
+                              ),
+                            ),
+                            const SizedBox(
+                              height: 8,
+                            ),
+                            TextButton(
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        const SavedAddressesScreen(
+                                      isCheckoutMode:
+                                          true,
+                                    ),
+                                  ),
+                                );
+                              },
+                              child: const Text(
+                                "Add / Select Address",
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     ),
@@ -210,7 +440,8 @@ if (cartDocs.isEmpty) {
                       "Payment Method",
                       style: TextStyle(
                         fontSize: 18,
-                        fontWeight: FontWeight.bold,
+                        fontWeight:
+                            FontWeight.bold,
                       ),
                     ),
 
@@ -237,7 +468,8 @@ if (cartDocs.isEmpty) {
                     paymentTile(
                       "Wallet",
                       "WALLET",
-                      Icons.account_balance_wallet,
+                      Icons
+                          .account_balance_wallet,
                     ),
 
                     const SizedBox(height: 20),
@@ -245,160 +477,291 @@ if (cartDocs.isEmpty) {
                     Container(
                       padding:
                           const EdgeInsets.all(16),
-
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius:
                             BorderRadius.circular(16),
                       ),
-
                       child: Column(
                         children: [
-
                           summaryRow(
-  "Item Total",
-  bill.itemsTotal,
-),
-
-                         summaryRow(
-  "Delivery Fee",
-  bill.deliveryFee,
-),
-
-summaryRow(
-  "Platform Fee",
-  bill.platformFee,
-),
-                         summaryRow(
-  "Discount",
-  -bill.couponDiscount,
-),
+                            "Item Total",
+                            bill.itemsTotal,
+                          ),
+                          summaryRow(
+                            "Delivery Fee",
+                            bill.deliveryFee,
+                          ),
+                          summaryRow(
+                            "Platform Fee",
+                            bill.platformFee,
+                          ),
+                          summaryRow(
+                            "Discount",
+                            -bill.couponDiscount,
+                          ),
                           const Divider(),
-
-                         summaryRow(
-  "Grand Total",
-  bill.grandTotal,
-  isBold: true,
-),
+                          summaryRow(
+                            "Grand Total",
+                            bill.grandTotal,
+                            isBold: true,
+                          ),
                         ],
                       ),
                     ),
-const SizedBox(height: 30),
+
+                    const SizedBox(height: 30),
 
                     SizedBox(
                       width: double.infinity,
                       height: 55,
                       child: ElevatedButton(
-                        onPressed: isLoading
-                            ? null
-                            : () async {
-
-                                setState(() {
-                                  isLoading = true;
-                                });
-
-                                try {
-
-                                  final orderId = FirebaseFirestore
-                                      .instance
-                                      .collection("orders")
-                                      .doc()
-                                      .id;
-
-                                  final orderNumber =
-                                      "JMB${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}";
-
-                                  final List<Map<String, dynamic>>
-                                      items = [];
-
-                                  String restaurantId = "";
-                                  String restaurantName = "";
-
-                                  for (final doc in cartDocs) {
-
-                                    final data = doc.data()
-                                        as Map<String, dynamic>;
-
-                                    items.add(data);
-
-                                    restaurantId =
-                                        data["restaurantId"] ?? "";
-
-                                    restaurantName =
-                                        data["restaurantName"] ?? "";
-                                  }
-
-                                  final order = OrderModel(
-                                    orderId: orderId,
-                                    orderNumber: orderNumber,
-                                    userId: uid,
-                                    restaurantId: restaurantId,
-                                    restaurantName: restaurantName,
-                                    items: items,
-                                    deliveryAddress:
-                                        address ?? {},
-                                    paymentMethod:
-                                        selectedPayment,
-                                    paymentStatus: "Pending",
-                                    orderStatus: "Pending",
-                                    subtotal: subtotal,
-                                   deliveryFee: bill.deliveryFee,
-                                   platformFee: bill.platformFee,
-discount: bill.couponDiscount,
-totalAmount: bill.grandTotal,
-                                    createdAt:
-                                        DateTime.now(),
-                                  );
-
-                                  await _orderService
-                                      .placeOrder(order);
-
-                                  await _cartService
-                                      .clearCart();
-                                  
-
-                                  if (!mounted) return;
-
-                                  Navigator.pushReplacement(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) => OrderSuccessScreen(
-  order: order,
-),
-                                    ),
-                                  );
-
-                                } catch (e) {
-
-                                  ScaffoldMessenger.of(
-                                    context,
-                                  ).showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                        e.toString(),
-                                      ),
-                                    ),
-                                  );
-
-                                } finally {
-
-                                  if (mounted) {
+                        onPressed:
+                            isLoading ||
+                                    !hasValidAddress
+                                ? null
+                                : () async {
                                     setState(() {
-                                      isLoading = false;
+                                      isLoading =
+                                          true;
                                     });
-                                  }
 
-                                }
-                              },
+                                    try {
+                                      // Final address
+                                      // verification before
+                                      // creating the order.
+                                      final latestAddress =
+                                          await _getSelectedAddress(
+                                        uid,
+                                      );
 
+                                      if (!_isValidAddress(
+                                        latestAddress,
+                                      )) {
+                                        await _showAddressRequiredPopup();
+                                        return;
+                                      }
+
+                                      final orderId =
+                                          FirebaseFirestore
+                                              .instance
+                                              .collection(
+                                                "orders",
+                                              )
+                                              .doc()
+                                              .id;
+
+                                      final orderNumber =
+                                          "JMB${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}";
+
+                                      final List<
+                                              Map<String,
+                                                  dynamic>>
+                                          items = [];
+
+                                      String restaurantId =
+                                          "";
+                                      String restaurantName =
+                                          "";
+
+                                      for (final doc
+                                          in cartDocs) {
+                                        final data =
+                                            doc.data()
+                                                as Map<
+                                                    String,
+                                                    dynamic>;
+
+                                        items.add(data);
+
+                                        restaurantId =
+                                            data[
+                                                    "restaurantId"] ??
+                                                "";
+
+                                        restaurantName =
+                                            data[
+                                                    "restaurantName"] ??
+                                                "";
+                                      }
+
+                                      final userDoc =
+                                          await FirebaseFirestore
+                                              .instance
+                                              .collection(
+                                                "users",
+                                              )
+                                              .doc(uid)
+                                              .get();
+
+                                      final userData =
+                                          userDoc.data() ??
+                                              {};
+
+                                      final restaurantDoc =
+                                          await FirebaseFirestore
+                                              .instance
+                                              .collection(
+                                                "restaurant_registrations",
+                                              )
+                                              .doc(
+                                                restaurantId,
+                                              )
+                                              .get();
+
+                                      final restaurantData =
+                                          restaurantDoc
+                                                  .data() ??
+                                              {};
+
+                                      final restaurantAddress =
+                                          restaurantData[
+                                                  "address"] ??
+                                              "";
+
+                                      final restaurantLatitude =
+                                          (restaurantData[
+                                                      "latitude"] ??
+                                                  0)
+                                              .toDouble();
+
+                                      final restaurantLongitude =
+                                          (restaurantData[
+                                                      "longitude"] ??
+                                                  0)
+                                              .toDouble();
+
+                                      final customerLongitude =
+                                          (latestAddress![
+                                                      "longitude"] ??
+                                                  0)
+                                              .toDouble();
+
+                                      final customerLatitude =
+                                          (latestAddress[
+                                                      "latitude"] ??
+                                                  0)
+                                              .toDouble();
+
+                                      final order =
+                                          OrderModel(
+                                        orderId: orderId,
+                                        orderNumber:
+                                            orderNumber,
+                                        userId: uid,
+                                        customerName:
+                                            userData[
+                                                    "fullName"] ??
+                                                "",
+                                        customerPhone:
+                                            userData[
+                                                    "phone"] ??
+                                                "",
+                                        deliveryPartnerId:
+                                            "",
+                                        deliveryPartnerName:
+                                            "",
+                                        deliveryPartnerPhone:
+                                            "",
+                                        vehicleNumber:
+                                            "",
+                                        restaurantId:
+                                            restaurantId,
+                                        restaurantName:
+                                            restaurantName,
+                                        restaurantAddress:
+                                            restaurantAddress,
+                                        restaurantLatitude:
+                                            restaurantLatitude,
+                                        restaurantLongitude:
+                                            restaurantLongitude,
+                                        items: items,
+                                        deliveryAddress:
+                                            latestAddress,
+                                        customerLatitude:
+                                            customerLatitude,
+                                        customerLongitude:
+                                            customerLongitude,
+                                        paymentMethod:
+                                            selectedPayment,
+                                        paymentStatus:
+                                            "Pending",
+                                        orderStatus:
+                                            "Pending",
+                                        subtotal:
+                                            subtotal,
+                                        deliveryFee:
+                                            bill.deliveryFee,
+                                        platformFee:
+                                            bill.platformFee,
+                                        discount:
+                                            bill.couponDiscount,
+                                        totalAmount:
+                                            bill.grandTotal,
+                                        createdAt:
+                                            DateTime.now(),
+                                      );
+
+                                      await _orderService
+                                          .placeOrder(
+                                        order,
+                                        couponCode:
+                                            widget.couponApplied
+                                                ? widget
+                                                    .couponCode
+                                                : null,
+                                      );
+
+                                      await _cartService
+                                          .clearCart();
+
+                                      if (!mounted) {
+                                        return;
+                                      }
+
+                                      Navigator
+                                          .pushReplacement(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) =>
+                                              OrderDetailsScreen(
+                                            order: order,
+                                          ),
+                                        ),
+                                      );
+                                    } catch (e) {
+                                      if (!mounted) {
+                                        return;
+                                      }
+
+                                      ScaffoldMessenger
+                                          .of(context)
+                                          .showSnackBar(
+                                        SnackBar(
+                                          content:
+                                              Text(
+                                            e.toString(),
+                                          ),
+                                        ),
+                                      );
+                                    } finally {
+                                      if (mounted) {
+                                        setState(() {
+                                          isLoading =
+                                              false;
+                                        });
+                                      }
+                                    }
+                                  },
                         style:
                             ElevatedButton.styleFrom(
                           backgroundColor:
                               Colors.deepPurple,
                           foregroundColor:
                               Colors.white,
+                          disabledBackgroundColor:
+                              Colors.grey.shade400,
                         ),
-
                         child: isLoading
                             ? const CircularProgressIndicator(
                                 color: Colors.white,
@@ -413,7 +776,7 @@ totalAmount: bill.grandTotal,
                               ),
                       ),
                     ),
-],
+                  ],
                 ),
               );
             },
@@ -429,10 +792,12 @@ totalAmount: bill.grandTotal,
     IconData icon,
   ) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin:
+          const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius:
+            BorderRadius.circular(16),
       ),
       child: RadioListTile<String>(
         value: value,
@@ -457,25 +822,32 @@ totalAmount: bill.grandTotal,
     bool isBold = false,
   }) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
+      padding:
+          const EdgeInsets.symmetric(
+        vertical: 6,
+      ),
       child: Row(
         children: [
           Expanded(
             child: Text(
               title,
               style: TextStyle(
-                fontWeight:
-                    isBold ? FontWeight.bold : FontWeight.normal,
-                fontSize: isBold ? 16 : 14,
+                fontWeight: isBold
+                    ? FontWeight.bold
+                    : FontWeight.normal,
+                fontSize:
+                    isBold ? 16 : 14,
               ),
             ),
           ),
           Text(
             "₹${amount.toStringAsFixed(2)}",
             style: TextStyle(
-              fontWeight:
-                  isBold ? FontWeight.bold : FontWeight.normal,
-              fontSize: isBold ? 16 : 14,
+              fontWeight: isBold
+                  ? FontWeight.bold
+                  : FontWeight.normal,
+              fontSize:
+                  isBold ? 16 : 14,
             ),
           ),
         ],

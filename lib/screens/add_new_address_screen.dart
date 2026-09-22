@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:geocoding/geocoding.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
@@ -33,17 +32,20 @@ class _AddNewAddressScreenState
   final stateController = TextEditingController();
   final pincodeController = TextEditingController();
   final landmarkController = TextEditingController();
+  double? _latitude;
+double? _longitude;
 
   bool isLoading = true;
   bool isSaving = false;
 
   String selectedType = "Home";
   Future<void> getCurrentLocation() async {
-
   bool serviceEnabled =
       await Geolocator.isLocationServiceEnabled();
 
   if (!serviceEnabled) {
+    if (!mounted) return;
+
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text("Please enable Location"),
@@ -60,7 +62,10 @@ class _AddNewAddressScreenState
         await Geolocator.requestPermission();
   }
 
-  if (permission == LocationPermission.deniedForever) {
+  if (permission == LocationPermission.denied ||
+      permission == LocationPermission.deniedForever) {
+    if (!mounted) return;
+
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text("Location Permission Denied"),
@@ -69,48 +74,159 @@ class _AddNewAddressScreenState
     return;
   }
 
-  Position position =
-      await Geolocator.getCurrentPosition();
-
   try {
+    final position =
+        await Geolocator.getCurrentPosition(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.high,
+      ),
+    );
 
-  const apiKey = "AIzaSyATVKIrhaNIbGulsfeLEnP5Tzukqnc3m_s";
+    _latitude = position.latitude;
+    _longitude = position.longitude;
 
-  final url =
-      "https://maps.googleapis.com/maps/api/geocode/json"
-      "?latlng=${position.latitude},${position.longitude}"
-      "&key=$apiKey";
+    const apiKey =
+        "AIzaSyATVKIrhaNIbGulsfeLEnP5Tzukqnc3m_s";
 
-  final response = await http.get(Uri.parse(url));
+    final url =
+        "https://maps.googleapis.com/maps/api/geocode/json"
+        "?latlng=${position.latitude},${position.longitude}"
+        "&key=$apiKey";
 
-  final data = jsonDecode(response.body);
+    final response =
+        await http.get(Uri.parse(url));
 
-  if (data["status"] == "OK") {
+    final data = jsonDecode(response.body);
 
-    final result = data["results"][0];
+    if (data["status"] != "OK") {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            "${data["status"]}\n"
+            "${data["error_message"] ?? ""}",
+          ),
+        ),
+      );
+
+      return;
+    }
+
+    final results = data["results"];
+
+    if (results == null ||
+        results is! List ||
+        results.isEmpty) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            "Address details could not be found.",
+          ),
+        ),
+      );
+
+      return;
+    }
+
+    final result = results[0];
+
+    final components =
+        result["address_components"] as List<dynamic>? ??
+            [];
+
+    String? streetNumber;
+    String? route;
+    String? subLocality;
+    String? neighborhood;
+    String? locality;
+    String? administrativeArea;
+    String? postalCode;
+
+    for (final component in components) {
+      final types =
+          (component["types"] as List<dynamic>? ?? [])
+              .map((type) => type.toString())
+              .toList();
+
+      final longName =
+          (component["long_name"] ?? "").toString().trim();
+
+      if (types.contains("street_number")) {
+        streetNumber = longName;
+      } else if (types.contains("route")) {
+        route = longName;
+      } else if (types.contains("sublocality_level_1") ||
+          types.contains("sublocality")) {
+        subLocality = longName;
+      } else if (types.contains("neighborhood")) {
+        neighborhood = longName;
+      } else if (types.contains("locality")) {
+        locality = longName;
+      } else if (types.contains(
+        "administrative_area_level_1",
+      )) {
+        administrativeArea = longName;
+      } else if (types.contains("postal_code")) {
+        postalCode = longName;
+      }
+    }
+
+    final addressParts = <String>[
+      if (streetNumber != null &&
+          streetNumber.isNotEmpty)
+        streetNumber,
+      if (route != null && route.isNotEmpty)
+        route,
+      if (subLocality != null &&
+          subLocality.isNotEmpty)
+        subLocality,
+    ];
+
+    final addressText = addressParts.join(", ");
 
     addressController.text =
-        result["formatted_address"];
+        addressText.isNotEmpty
+            ? addressText
+            : (result["formatted_address"] ?? "")
+                .toString();
 
-  } else {
+    cityController.text =
+        locality ?? "";
+
+    stateController.text =
+        administrativeArea ?? "";
+
+    pincodeController.text =
+        postalCode ?? "";
+
+    landmarkController.text =
+        subLocality ??
+        neighborhood ??
+        "";
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          "Current location added successfully ✅",
+        ),
+      ),
+    );
+  } catch (e) {
+    if (!mounted) return;
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-  "${data["status"]}\n${data["error_message"] ?? ""}",
-),
+          "Unable to get address: $e",
+        ),
       ),
     );
   }
-
-} catch (e) {
-
-  ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(
-      content: Text(e.toString()),
-    ),
-  );
-}
 }
 
   @override
@@ -431,6 +547,9 @@ SizedBox(
   "state": stateController.text.trim(),
   "pincode": pincodeController.text.trim(),
   "type": selectedType,
+  "latitude": _latitude,
+
+"longitude": _longitude,
 
   if (widget.documentId == null)
     "createdAt": FieldValue.serverTimestamp(),

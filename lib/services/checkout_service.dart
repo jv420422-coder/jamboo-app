@@ -7,10 +7,12 @@ class CheckoutService {
   String? selectedAddressId;
   String? appliedCouponCode;
   bool couponApplied = false;
+  double couponDiscount = 0;
 
   void clear() {
     selectedAddressId = null;
     appliedCouponCode = null;
     couponApplied = false;
+    couponDiscount = 0;
   }
 }

@@ -9,7 +9,7 @@ class FeedbackThankYouCard extends StatelessWidget {
   });
 
   String get title {
-    return "💚 Thank You!";
+    return "Thank You!";
   }
 
   String get message {
@@ -38,136 +38,135 @@ class FeedbackThankYouCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-
-      padding: const EdgeInsets.all(22),
-
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFFF1FFF5),
-
-        borderRadius:
-            BorderRadius.circular(18),
-
+        color: const Color(0xFFF5FFF8),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: Colors.green,
-          width: 1.4,
+          color: const Color(0xFFD6F1DE),
         ),
-
         boxShadow: [
           BoxShadow(
-            color:
-                Colors.black.withOpacity(0.05),
-
-            blurRadius: 12,
-
-            offset: const Offset(0, 4),
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 14,
+            offset: const Offset(0, 5),
           ),
         ],
       ),
       child: Column(
         children: [
-
-          Text(
-            title,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.bold,
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: const Color(0xFFD6F1DE),
+              ),
+            ),
+            child: const Icon(
+              Icons.favorite_rounded,
               color: Colors.green,
+              size: 25,
             ),
           ),
 
-          const SizedBox(height: 18),
+          const SizedBox(height: 10),
+
+          const Text(
+            "Thank You!",
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF16803C),
+            ),
+          ),
+
+          const SizedBox(height: 10),
 
           Row(
-            mainAxisAlignment:
-                MainAxisAlignment.center,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: List.generate(
               5,
               (index) => Padding(
-                padding:
-                    const EdgeInsets.symmetric(
-                  horizontal: 2,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 2),
                 child: Icon(
                   index < rating
                       ? Icons.star_rounded
                       : Icons.star_outline_rounded,
-                  color: Colors.amber,
-                  size: 32,
+                  color: const Color(0xFFF4B400),
+                  size: 23,
                 ),
               ),
             ),
           ),
 
-          const SizedBox(height: 22),
+          const SizedBox(height: 12),
 
           Text(
             message,
             textAlign: TextAlign.center,
             style: const TextStyle(
-              fontSize: 18,
+              fontSize: 14,
               fontWeight: FontWeight.w600,
-              color: Colors.black87,
+              color: Color(0xFF242424),
               height: 1.4,
             ),
           ),
 
-          const SizedBox(height: 20),
+          const SizedBox(height: 12),
 
-          const Text(
-            "Your valuable feedback has been submitted successfully.\n\n"
-            "Your review helps other customers\n"
-            "and helps the restaurant improve.",
+          Text(
+            "Your valuable feedback has been submitted successfully.\n"
+            "Your review helps other customers and helps the restaurant improve.",
             textAlign: TextAlign.center,
             style: TextStyle(
-              fontSize: 15,
-              color: Colors.black54,
-              height: 1.6,
+              fontSize: 12,
+              color: Colors.grey.shade600,
+              height: 1.45,
             ),
           ),
 
-          const SizedBox(height: 24),
+          const SizedBox(height: 14),
 
-          Divider(
-            color: Colors.green.shade200,
-            thickness: 1,
+          Container(
+            width: double.infinity,
+            height: 1,
+            color: const Color(0xFFDDEFE2),
           ),
 
-          const SizedBox(height: 18),
+          const SizedBox(height: 13),
 
           Row(
-            mainAxisAlignment:
-                MainAxisAlignment.center,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: const [
-
               Icon(
                 Icons.verified_rounded,
                 color: Colors.green,
-                size: 22,
+                size: 18,
               ),
-
-              SizedBox(width: 8),
-
+              SizedBox(width: 6),
               Text(
                 "Review Submitted",
                 style: TextStyle(
-                  color: Colors.green,
+                  color: Color(0xFF16803C),
                   fontWeight: FontWeight.bold,
-                  fontSize: 16,
+                  fontSize: 13,
                 ),
               ),
-
             ],
           ),
 
-          const SizedBox(height: 14),
+          const SizedBox(height: 9),
 
           const Text(
             "We hope to serve you again soon. 💜",
             textAlign: TextAlign.center,
             style: TextStyle(
-              fontSize: 15,
-              color: Colors.deepPurple,
+              fontSize: 12.5,
+              color: Color(0xFF7E57C2),
               fontWeight: FontWeight.w600,
             ),
           ),

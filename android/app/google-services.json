@@ -39,10 +39,194 @@
               "client_type": 3
             },
             {
-              "client_id": "514105496890-bgb83l5rb8df31hsg0ir8q88c76itb2s.apps.googleusercontent.com",
+              "client_id": "514105496890-7u4anged7458qlkej7i3s625d9j56icq.apps.googleusercontent.com",
               "client_type": 2,
               "ios_info": {
-                "bundle_id": "com.example.jamboo"
+                "bundle_id": "com.example.jambooDeliveryPartner"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:514105496890:android:5a57a12511fa48231e2c03",
+        "android_client_info": {
+          "package_name": "com.example.jamboo_delivery_partner"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "514105496890-upg4kd8nfbr6uomcg0gf5un2qkmh4bkj.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.jamboo_delivery_partner",
+            "certificate_hash": "77861ce8edceb61776eac9d0fa45169996c2a0c3"
+          }
+        },
+        {
+          "client_id": "514105496890-3o6lnsf4vrukhjqf59oe4nfkd0o6g7l9.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBOvDnUwPF_zRxuUTi4XdW0Xbbn6cKUgzg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "514105496890-3o6lnsf4vrukhjqf59oe4nfkd0o6g7l9.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "514105496890-7u4anged7458qlkej7i3s625d9j56icq.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.jambooDeliveryPartner"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:514105496890:android:35be8e7b9d3bde7e1e2c03",
+        "android_client_info": {
+          "package_name": "com.example.jamboo_restaurant_partner"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "514105496890-q4p8rpfcqntak6731hh24eov18cqi9v9.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.jamboo_restaurant_partner",
+            "certificate_hash": "77861ce8edceb61776eac9d0fa45169996c2a0c3"
+          }
+        },
+        {
+          "client_id": "514105496890-3o6lnsf4vrukhjqf59oe4nfkd0o6g7l9.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBOvDnUwPF_zRxuUTi4XdW0Xbbn6cKUgzg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "514105496890-3o6lnsf4vrukhjqf59oe4nfkd0o6g7l9.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "514105496890-7u4anged7458qlkej7i3s625d9j56icq.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.jambooDeliveryPartner"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:514105496890:android:8ca87858cf79ab0c1e2c03",
+        "android_client_info": {
+          "package_name": "com.jamboo.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "514105496890-ijq1iddli0qukd5d02hagcqp9e0a53lm.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.jamboo.app",
+            "certificate_hash": "77861ce8edceb61776eac9d0fa45169996c2a0c3"
+          }
+        },
+        {
+          "client_id": "514105496890-3o6lnsf4vrukhjqf59oe4nfkd0o6g7l9.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBOvDnUwPF_zRxuUTi4XdW0Xbbn6cKUgzg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "514105496890-3o6lnsf4vrukhjqf59oe4nfkd0o6g7l9.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "514105496890-7u4anged7458qlkej7i3s625d9j56icq.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.jambooDeliveryPartner"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:514105496890:android:145e53ae927bc3e81e2c03",
+        "android_client_info": {
+          "package_name": "com.jamboofooddelivery.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "514105496890-hjqg5elm9l99mi36alqf3k1o1t8dt2me.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.jamboofooddelivery.app",
+            "certificate_hash": "7d00f3d7cb153cac0bb8e84437c727266058933f"
+          }
+        },
+        {
+          "client_id": "514105496890-req1fls9g6gmoul4s7kuje8536bgaqh7.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.jamboofooddelivery.app",
+            "certificate_hash": "32b5726ff306307c35e7b595ea95f548617b2d27"
+          }
+        },
+        {
+          "client_id": "514105496890-3o6lnsf4vrukhjqf59oe4nfkd0o6g7l9.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBOvDnUwPF_zRxuUTi4XdW0Xbbn6cKUgzg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "514105496890-3o6lnsf4vrukhjqf59oe4nfkd0o6g7l9.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "514105496890-7u4anged7458qlkej7i3s625d9j56icq.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.jambooDeliveryPartner"
               }
             }
           ]

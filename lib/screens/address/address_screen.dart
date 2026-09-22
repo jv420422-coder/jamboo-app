@@ -272,7 +272,10 @@ AddressTypeChip(
                     context,
                     MaterialPageRoute(
                       builder: (_) =>
-                          const PaymentScreen(),
+    const PaymentScreen(
+  couponApplied: false,
+  couponDiscount: 0,
+),
                     ),
                   );
                 },

@@ -4,29 +4,31 @@ class OrderDetailsStatusHelper {
   const OrderDetailsStatusHelper._();
 
   static Color statusColor(String orderStatus) {
-    switch (orderStatus) {
-      case "Pending":
+  final status = orderStatus.trim().toLowerCase();
+
+  switch (status) {
+      case "pending":
         return Colors.orange;
 
-      case "Accepted":
+      case "accepted":
         return Colors.blue;
 
-      case "Preparing":
+      case "preparing":
         return Colors.deepPurple;
 
-      case "Ready":
+      case "ready":
         return Colors.indigo;
 
-      case "PickedUp":
+      case "pickedup":
         return Colors.teal;
 
-      case "OutForDelivery":
+      case "outfordelivery":
         return Colors.green;
 
-      case "Delivered":
+      case "delivered":
         return Colors.green;
 
-      case "Cancelled":
+      case "cancelled":
         return Colors.red;
 
       default:
@@ -35,29 +37,31 @@ class OrderDetailsStatusHelper {
   }
 
   static String statusTitle(String orderStatus) {
-    switch (orderStatus) {
-      case "Pending":
+  final status = orderStatus.trim().toLowerCase();
+
+  switch (status) {
+      case "pending":
         return "Order Received";
 
-      case "Accepted":
+      case "accepted":
         return "Restaurant Accepted";
 
-      case "Preparing":
+      case "preparing":
         return "Preparing Food";
 
-      case "Ready":
+      case "ready":
         return "Ready For Pickup";
 
-      case "PickedUp":
+      case "pickedup":
         return "Picked Up";
 
-      case "OutForDelivery":
+      case "outfordelivery":
         return "On The Way";
 
-      case "Delivered":
+      case "delivered":
         return "Delivered";
 
-      case "Cancelled":
+      case "cancelled":
         return "Order Cancelled";
 
       default:
@@ -66,29 +70,31 @@ class OrderDetailsStatusHelper {
   }
 
   static String statusMessage(String orderStatus) {
-    switch (orderStatus) {
-      case "Pending":
+  final status = orderStatus.trim().toLowerCase();
+
+  switch (status) {
+      case "pending":
         return "Your restaurant has received the order.";
 
-      case "Accepted":
+      case "accepted":
         return "Restaurant accepted your order.";
 
-      case "Preparing":
+      case "preparing":
         return "Our chefs are preparing your delicious meal.";
 
-      case "Ready":
+      case "ready":
         return "Your order is packed and ready.";
 
-      case "PickedUp":
+      case "pickedup":
         return "Delivery partner picked your order.";
 
-      case "OutForDelivery":
+      case "outfordelivery":
         return "Your food is almost there.";
 
-      case "Delivered":
+      case "delivered":
         return "Enjoy your delicious meal.";
 
-      case "Cancelled":
+      case "cancelled":
         return "This order has been cancelled.";
 
       default:
@@ -97,29 +103,31 @@ class OrderDetailsStatusHelper {
   }
 
   static IconData statusIcon(String orderStatus) {
-    switch (orderStatus) {
-      case "Pending":
+  final status = orderStatus.trim().toLowerCase();
+
+  switch (status) {
+      case "pending":
         return Icons.receipt_long;
 
-      case "Accepted":
+      case "accepted":
         return Icons.check_circle;
 
-      case "Preparing":
+      case "preparing":
         return Icons.restaurant;
 
-      case "Ready":
+      case "ready":
         return Icons.inventory;
 
-      case "PickedUp":
+      case "pickedup":
         return Icons.delivery_dining;
 
-      case "OutForDelivery":
+      case "outfordelivery":
         return Icons.local_shipping;
 
-      case "Delivered":
+      case "delivered":
         return Icons.celebration;
 
-      case "Cancelled":
+      case "cancelled":
         return Icons.cancel;
 
       default:

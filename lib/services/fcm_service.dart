@@ -39,10 +39,14 @@ class FCMService {
     );
 
     // Device Token
-    final token = await messaging.getToken();
+try {
+  final token = await messaging.getToken();
 
-    print("FCM TOKEN:");
-    print(token);
+  print("FCM TOKEN:");
+  print(token);
+} catch (e) {
+  print("FCM Token Error: $e");
+}
 
     // Android notification channel
     await _localNotifications

@@ -7,6 +7,10 @@ class CartItemModel {
   final double price;
   final int quantity;
   final String emoji;
+  final String imageUrl;
+
+  // Preparation
+  final int preparationTime;
 
   CartItemModel({
     required this.id,
@@ -17,6 +21,8 @@ class CartItemModel {
     required this.price,
     required this.quantity,
     required this.emoji,
+    this.imageUrl = "",
+    required this.preparationTime,
   });
 
   Map<String, dynamic> toMap() {
@@ -29,20 +35,30 @@ class CartItemModel {
       "price": price,
       "quantity": quantity,
       "emoji": emoji,
+      "imageUrl": imageUrl,
+
+      // Preparation time snapshot
+      "preparationTime": preparationTime,
     };
   }
 
   factory CartItemModel.fromMap(
-      Map<String, dynamic> map) {
+    Map<String, dynamic> map,
+  ) {
     return CartItemModel(
-      id: map["id"],
-      restaurantId: map["restaurantId"],
-      restaurantName: map["restaurantName"],
-      itemName: map["itemName"],
-      description: map["description"],
-      price: (map["price"] as num).toDouble(),
-      quantity: map["quantity"],
-      emoji: map["emoji"],
+      id: map["id"] ?? "",
+      restaurantId: map["restaurantId"] ?? "",
+      restaurantName: map["restaurantName"] ?? "",
+      itemName: map["itemName"] ?? "",
+      description: map["description"] ?? "",
+      price: (map["price"] ?? 0).toDouble(),
+      quantity: map["quantity"] ?? 1,
+      emoji: map["emoji"] ?? "🍽️",
+      imageUrl: map["imageUrl"] ?? "",
+
+      // Old cart items ke liye default 20 minutes
+      preparationTime:
+          (map["preparationTime"] ?? 20).toInt(),
     );
   }
 }

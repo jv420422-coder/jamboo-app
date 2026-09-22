@@ -43,12 +43,12 @@ class CategoryCard extends StatelessWidget {
           children: [
             Image.asset(
               imagePath,
-              width: 70,
-              height: 70,
+              width: 80,
+              height: 80,
               fit: BoxFit.contain,
             ),
 
-            const SizedBox(height: 8),
+            const SizedBox(height: 4),
 
             Text(
               title,

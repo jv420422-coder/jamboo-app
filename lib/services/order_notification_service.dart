@@ -2,6 +2,7 @@ import 'package:uuid/uuid.dart';
 
 import '../models/notification_model.dart';
 import 'notification_service.dart';
+import 'package:flutter/foundation.dart';
 
 class OrderNotificationService {
   OrderNotificationService._();
@@ -137,6 +138,38 @@ class OrderNotificationService {
           "Your order has been cancelled successfully.",
     );
   }
+
+  // ==========================
+// Restaurant New Order
+// ==========================
+
+static Future<void> restaurantNewOrder({
+  required String restaurantId,
+  required String orderId,
+  required String orderNumber,
+}) async {
+  try {
+    final notification = NotificationModel(
+      notificationId: _uuid.v4(),
+      userId: restaurantId,
+      title: "New Order Received 🍽️",
+      message: "You have received a new order ($orderNumber).",
+      type: "RestaurantNewOrder",
+      isRead: false,
+      createdAt: DateTime.now(),
+      orderId: orderId,
+    );
+
+    await _notificationService.createNotification(
+      notification: notification,
+    );
+
+    debugPrint("Restaurant notification created successfully");
+  } catch (e, s) {
+    debugPrint("Restaurant notification failed: $e");
+    debugPrint("$s");
+  }
+}
 
   // ==========================
   // Internal Method

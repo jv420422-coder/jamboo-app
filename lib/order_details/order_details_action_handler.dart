@@ -92,11 +92,13 @@ class OrderDetailsActionHandler {
       context,
       MaterialPageRoute(
         builder: (_) => RatingScreen(
-          orderId: order.orderId,
-          orderNumber: order.orderNumber,
-          restaurantId: order.restaurantId,
-          restaurantName: order.restaurantName,
-        ),
+  orderId: order.orderId,
+  orderNumber: order.orderNumber,
+  restaurantId: order.restaurantId,
+  restaurantName: order.restaurantName,
+  deliveryPartnerId: order.deliveryPartnerId,
+  deliveryPartnerName: order.deliveryPartnerName,
+),
       ),
     );
 

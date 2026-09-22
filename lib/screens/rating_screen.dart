@@ -12,6 +12,8 @@ class RatingScreen extends StatefulWidget {
 
   final String restaurantId;
   final String restaurantName;
+  final String deliveryPartnerId;
+final String deliveryPartnerName;
 
   const RatingScreen({
     super.key,
@@ -19,6 +21,8 @@ class RatingScreen extends StatefulWidget {
     required this.orderNumber,
     required this.restaurantId,
     required this.restaurantName,
+    required this.deliveryPartnerId,
+required this.deliveryPartnerName,
   });
 
   @override
@@ -27,6 +31,7 @@ class RatingScreen extends StatefulWidget {
 
 class _RatingScreenState extends State<RatingScreen> {
   int _selectedRating = 0;
+  int _selectedDeliveryRating = 0;
 
   final TextEditingController _reviewController =
       TextEditingController();
@@ -169,6 +174,58 @@ class _RatingScreenState extends State<RatingScreen> {
               ),
 
               const SizedBox(height: 35),
+              const Align(
+  alignment: Alignment.centerLeft,
+  child: Text(
+    "How was your delivery?",
+    style: TextStyle(
+      fontSize: 17,
+      fontWeight: FontWeight.bold,
+    ),
+  ),
+),
+
+const SizedBox(height: 12),
+
+Text(
+  widget.deliveryPartnerName.isNotEmpty
+      ? widget.deliveryPartnerName
+      : "Delivery Partner",
+  style: const TextStyle(
+    color: Colors.grey,
+    fontSize: 14,
+  ),
+),
+
+const SizedBox(height: 12),
+
+Row(
+  mainAxisAlignment:
+      MainAxisAlignment.center,
+  children: List.generate(
+    5,
+    (index) {
+      return IconButton(
+        splashRadius: 26,
+        onPressed: () {
+          setState(() {
+            _selectedDeliveryRating =
+                index + 1;
+          });
+        },
+        icon: Icon(
+          index < _selectedDeliveryRating
+              ? Icons.star
+              : Icons.star_border,
+          color: Colors.amber,
+          size: 40,
+        ),
+      );
+    },
+  ),
+),
+
+const SizedBox(height: 35),
 
               TextField(
 
@@ -213,61 +270,177 @@ class _RatingScreenState extends State<RatingScreen> {
                       ? null
                       : () async {
 
-                          if (_selectedRating == 0) {
+                          if (_selectedRating == 0 ||
+    _selectedDeliveryRating == 0) {
+  ScaffoldMessenger.of(context).showSnackBar(
+    const SnackBar(
+      content: Text(
+        "Please rate both the restaurant and delivery partner.",
+      ),
+    ),
+  );
 
-                            ScaffoldMessenger.of(context)
-                                .showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                  "Please select a rating.",
-                                ),
-                              ),
-                            );
+  return;
+}
 
-                            return;
-                          }
-
-                          setState(() {
+setState(() {
   _isSubmitting = true;
 });
 
-final rating = RatingModel(
-  ratingId:
+try {
+  final currentUser =
+      FirebaseAuth.instance.currentUser;
+
+  if (currentUser == null) {
+    throw Exception(
+      "Customer is not logged in.",
+    );
+  }
+
+  if (widget.deliveryPartnerId.isEmpty) {
+    throw Exception(
+      "Delivery partner ID is missing.",
+    );
+  }
+
+  // ============================================================
+  // RESTAURANT RATING
+  // ============================================================
+
+  final rating = RatingModel(
+    ratingId:
+        FirebaseFirestore.instance
+            .collection("ratings")
+            .doc()
+            .id,
+
+    orderId: widget.orderId,
+    orderNumber: widget.orderNumber,
+
+    restaurantId: widget.restaurantId,
+    restaurantName: widget.restaurantName,
+
+    customerId: currentUser.uid,
+
+    customerName:
+        currentUser.displayName ??
+            "Customer",
+
+    rating:
+        _selectedRating.toDouble(),
+
+    review:
+        _reviewController.text.trim(),
+
+    createdAt:
+        DateTime.now(),
+  );
+
+  await RatingService().submitRating(
+    rating: rating,
+  );
+
+  // ============================================================
+  // DELIVERY PARTNER RATING
+  // ============================================================
+
+  final deliveryRatingId =
       FirebaseFirestore.instance
-          .collection("ratings")
+          .collection(
+            "delivery_partner_ratings",
+          )
           .doc()
-          .id,
+          .id;
 
-  orderId: widget.orderId,
-  orderNumber: widget.orderNumber,
+  await RatingService()
+      .submitDeliveryPartnerRating(
+    ratingId: deliveryRatingId,
 
-  restaurantId: widget.restaurantId,
-  restaurantName: widget.restaurantName,
+    orderId: widget.orderId,
 
-  customerId:
-      FirebaseAuth.instance.currentUser!.uid,
+    orderNumber: widget.orderNumber,
 
-  customerName:
-      FirebaseAuth.instance.currentUser?.displayName ??
-          "Customer",
+    deliveryPartnerId:
+        widget.deliveryPartnerId,
 
-  rating: _selectedRating.toDouble(),
+    deliveryPartnerName:
+        widget.deliveryPartnerName,
 
-  review:
-      _reviewController.text.trim(),
+    customerId:
+        currentUser.uid,
 
-  createdAt: DateTime.now(),
-);
+    customerName:
+        currentUser.displayName ??
+            "Customer",
 
-await RatingService().submitRating(
-  rating: rating,
-);
+    rating:
+        _selectedDeliveryRating
+            .toDouble(),
 
-if (!mounted) return;
+    review:
+        _reviewController.text.trim(),
+  );
 
-setState(() {
-  _isSubmitting = false;
-});
+  if (!mounted) return;
+
+  setState(() {
+    _isSubmitting = false;
+  });
+
+  await showDialog(
+    context: context,
+    builder: (_) {
+      return AlertDialog(
+        title: const Text(
+          "Thank You ❤️",
+        ),
+
+        content: const Text(
+          "Your review has been submitted successfully.",
+        ),
+
+        actions: [
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(
+                context,
+              );
+
+              Navigator.pop(
+                context,
+                "rated",
+              );
+            },
+
+            child: const Text(
+              "OK",
+            ),
+          ),
+        ],
+      );
+    },
+  );
+} catch (e) {
+  debugPrint(
+    "RATING SUBMISSION ERROR: $e",
+  );
+
+  if (!mounted) return;
+
+  setState(() {
+    _isSubmitting = false;
+  });
+
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Text(
+        "Rating submit nahi ho payi: $e",
+      ),
+      duration:
+          const Duration(seconds: 5),
+    ),
+  );
+}
 
                           showDialog(
 

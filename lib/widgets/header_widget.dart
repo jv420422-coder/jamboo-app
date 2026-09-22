@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
@@ -10,80 +11,108 @@ class HeaderWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final uid =
-        FirebaseAuth.instance.currentUser!.uid;
+    final user = FirebaseAuth.instance.currentUser;
 
-    final notificationService =
-        NotificationService();
+    if (user == null) {
+      return const SizedBox.shrink();
+    }
+
+    final uid = user.uid;
+
+    final notificationService = NotificationService();
 
     return Padding(
       padding: const EdgeInsets.symmetric(
         horizontal: 20,
-        vertical: 10,
+        vertical: 6,
       ),
       child: Row(
-        mainAxisAlignment:
-            MainAxisAlignment.spaceBetween,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-
-          GestureDetector(
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) =>
-                      const SavedAddressesScreen(),
-                ),
-              );
-            },
-
-            child: const Row(
-              children: [
-
-                Icon(
-                  Icons.location_on,
-                  color: Color(0xFF7E57C2),
-                ),
-
-                SizedBox(width: 5),
-
-                Text(
-                  "Chauri Chaura",
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight:
-                        FontWeight.bold,
+          // ==============================
+          // CURRENT LOCATION
+          // ==============================
+          Expanded(
+            child: GestureDetector(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const SavedAddressesScreen(),
                   ),
-                ),
-              ],
+                );
+              },
+              child: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                stream: FirebaseFirestore.instance
+                    .collection('users')
+                    .doc(uid)
+                    .snapshots(),
+                builder: (context, snapshot) {
+                  String locationText = 'Getting location...';
+
+                  if (snapshot.hasData && snapshot.data!.exists) {
+                    final data = snapshot.data!.data();
+
+                    final currentAddress =
+                        data?['currentAddress']?.toString().trim();
+
+                    if (currentAddress != null &&
+                        currentAddress.isNotEmpty) {
+                      locationText = currentAddress;
+                    }
+                  }
+
+                  return Row(
+                    children: [
+                      const Icon(
+                        Icons.location_on,
+                        color: Color(0xFF7E57C2),
+                        size: 27,
+                      ),
+
+                      const SizedBox(width: 5),
+
+                      Expanded(
+                        child: Text(
+                          locationText,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
             ),
           ),
 
+          const SizedBox(width: 8),
+
+          // ==============================
+          // NOTIFICATIONS
+          // ==============================
           StreamBuilder<int>(
-            stream: notificationService
-                .unreadCount(uid),
-
+            stream: notificationService.unreadCount(uid),
             builder: (context, snapshot) {
-
-              final unread =
-                  snapshot.data ?? 0;
+              final unread = snapshot.data ?? 0;
 
               return Stack(
                 clipBehavior: Clip.none,
                 children: [
-
                   IconButton(
                     icon: const Icon(
                       Icons.notifications_none_rounded,
                       size: 30,
                     ),
-
                     onPressed: () {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) =>
-                              const NotificationsScreen(),
+                          builder: (_) => const NotificationsScreen(),
                         ),
                       );
                     },
@@ -93,36 +122,23 @@ class HeaderWidget extends StatelessWidget {
                     Positioned(
                       right: 6,
                       top: 6,
-
                       child: Container(
-                        padding:
-                            const EdgeInsets.all(5),
-
-                        decoration:
-                            const BoxDecoration(
+                        padding: const EdgeInsets.all(5),
+                        decoration: const BoxDecoration(
                           color: Colors.red,
                           shape: BoxShape.circle,
                         ),
-
-                        constraints:
-                            const BoxConstraints(
+                        constraints: const BoxConstraints(
                           minWidth: 20,
                           minHeight: 20,
                         ),
-
                         child: Center(
                           child: Text(
-                            unread > 99
-                                ? "99+"
-                                : unread
-                                    .toString(),
-
-                            style:
-                                const TextStyle(
+                            unread > 99 ? "99+" : unread.toString(),
+                            style: const TextStyle(
                               color: Colors.white,
                               fontSize: 11,
-                              fontWeight:
-                                  FontWeight.bold,
+                              fontWeight: FontWeight.bold,
                             ),
                           ),
                         ),

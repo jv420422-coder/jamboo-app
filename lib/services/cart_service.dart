@@ -220,18 +220,23 @@ Future<ReorderResult> reorderOrder({
     }
 
     availableItems.add(
-      CartItemModel(
-        id: itemId,
-        restaurantId: menuData["restaurantId"],
-        restaurantName: item["restaurantName"],
-        itemName: menuData["name"],
-        description: menuData["description"],
-        price:
-            (menuData["price"] as num).toDouble(),
-        quantity: item["quantity"],
-        emoji: menuData["emoji"] ?? "🍽️",
-      ),
-    );
+  CartItemModel(
+    id: itemId,
+    restaurantId: menuData["restaurantId"],
+    restaurantName: item["restaurantName"],
+    itemName: menuData["name"],
+    description: menuData["description"],
+    price:
+        (menuData["price"] as num).toDouble(),
+    quantity: item["quantity"],
+    emoji: menuData["emoji"] ?? "🍽️",
+    imageUrl: menuData["imageUrl"] ?? "",
+
+    // Preserve current menu preparation time
+    preparationTime:
+        (menuData["preparationTime"] ?? 20).toInt(),
+  ),
+);
   }
 
   // Nothing available

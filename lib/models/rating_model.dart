@@ -24,16 +24,23 @@ class RatingModel {
   });
 
   Map<String, dynamic> toMap() {
-    return {
-      "ratingId": ratingId,
-      "orderId": orderId,
-      "restaurantId": restaurantId,
-      "customerId": customerId,
-      "rating": rating,
-      "review": review,
-      "createdAt": createdAt,
-    };
-  }
+  return {
+    "ratingId": ratingId,
+    "orderId": orderId,
+    "orderNumber": orderNumber,
+
+    "restaurantId": restaurantId,
+    "restaurantName": restaurantName,
+
+    "customerId": customerId,
+    "customerName": customerName,
+
+    "rating": rating,
+    "review": review,
+
+    "createdAt": createdAt,
+  };
+}
 
   factory RatingModel.fromMap(Map<String, dynamic> map) {
     return RatingModel(

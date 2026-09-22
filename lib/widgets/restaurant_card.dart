@@ -1,21 +1,25 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+
 import '../screens/restaurant_details_screen.dart';
 
 class RestaurantCard extends StatelessWidget {
   final String restaurantId;
-final String name;
-final String cuisine;
-final String rating;
-final String time;
+  final String name;
+  final String cuisine;
+  final String rating;
+  final String time;
+  final String? logoUrl;
 
   const RestaurantCard({
-  super.key,
-  required this.restaurantId,
-  required this.name,
-  required this.cuisine,
-  required this.rating,
-  required this.time,
-});
+    super.key,
+    required this.restaurantId,
+    required this.name,
+    required this.cuisine,
+    required this.rating,
+    required this.time,
+    this.logoUrl,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -24,11 +28,10 @@ final String time;
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) =>
-    RestaurantDetailsScreen(
-  restaurantId: restaurantId,
-  restaurantName: name,
-),
+            builder: (context) => RestaurantDetailsScreen(
+              restaurantId: restaurantId,
+              restaurantName: name,
+            ),
           ),
         );
       },
@@ -48,10 +51,8 @@ final String time;
           ],
         ),
         child: Column(
-          crossAxisAlignment:
-              CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-
             Container(
               height: 170,
               decoration: const BoxDecoration(
@@ -60,63 +61,80 @@ final String time;
                   top: Radius.circular(20),
                 ),
               ),
-              child: const Center(
-                child: Text(
-                  "🍔",
-                  style: TextStyle(fontSize: 70),
+              child: ClipRRect(
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(20),
                 ),
+                child: logoUrl != null && logoUrl!.isNotEmpty
+                    ? CachedNetworkImage(
+                        imageUrl: logoUrl!,
+                        width: double.infinity,
+                        height: double.infinity,
+                        fit: BoxFit.cover,
+                        placeholder: (context, url) {
+                          return const Center(
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                            ),
+                          );
+                        },
+                        errorWidget: (context, url, error) {
+                          return const Center(
+                            child: Text(
+                              "🍔",
+                              style: TextStyle(
+                                fontSize: 70,
+                              ),
+                            ),
+                          );
+                        },
+                      )
+                    : const Center(
+                        child: Text(
+                          "🍔",
+                          style: TextStyle(
+                            fontSize: 70,
+                          ),
+                        ),
+                      ),
               ),
             ),
-
             Padding(
               padding: const EdgeInsets.all(15),
               child: Column(
                 crossAxisAlignment:
                     CrossAxisAlignment.start,
                 children: [
-
                   Text(
                     name,
                     style: const TextStyle(
                       fontSize: 20,
-                      fontWeight:
-                          FontWeight.bold,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
-
                   const SizedBox(height: 6),
-
                   Text(
                     cuisine,
                     style: const TextStyle(
                       color: Colors.grey,
                     ),
                   ),
-
                   const SizedBox(height: 10),
-
                   Row(
                     children: [
-
                       const Icon(
                         Icons.star,
                         color: Colors.orange,
                         size: 18,
                       ),
-
                       const SizedBox(width: 4),
-
                       Text(rating),
-
                       const Spacer(),
-
                       const Icon(
                         Icons.access_time,
                         size: 18,
                       ),
-
                       const SizedBox(width: 4),
-
                       Text(time),
                     ],
                   ),

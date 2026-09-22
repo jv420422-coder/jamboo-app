@@ -441,8 +441,12 @@ return GestureDetector(
                       MaterialPageRoute(
                         builder: (_) =>
                             PaymentScreen(
-  couponApplied: CheckoutService.instance.couponApplied,
-  couponCode: CheckoutService.instance.appliedCouponCode,
+  couponApplied:
+      CheckoutService.instance.couponApplied,
+  couponCode:
+      CheckoutService.instance.appliedCouponCode,
+  couponDiscount:
+      CheckoutService.instance.couponDiscount,
 )
                       ),
                     );

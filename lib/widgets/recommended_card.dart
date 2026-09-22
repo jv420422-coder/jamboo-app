@@ -7,6 +7,9 @@ class RecommendedCard extends StatelessWidget {
   final String price;
   final String rating;
   final String time;
+  final String restaurantId;
+  final String restaurantName;
+  final String imageUrl;
 
   const RecommendedCard({
     super.key,
@@ -15,6 +18,9 @@ class RecommendedCard extends StatelessWidget {
     required this.price,
     required this.rating,
     required this.time,
+    required this.restaurantId,
+    required this.restaurantName,
+    required this.imageUrl,
   });
 
   @override
@@ -25,13 +31,9 @@ class RecommendedCard extends StatelessWidget {
           context,
           MaterialPageRoute(
             builder: (context) => RestaurantDetailsScreen(
-  restaurantId: title.contains("Biryani")
-      ? "biryani_king"
-      : "pizza_hub",
-  restaurantName: title.contains("Biryani")
-      ? "Biryani King"
-      : "Pizza Hub",
-),
+              restaurantId: restaurantId,
+              restaurantName: restaurantName,
+            ),
           ),
         );
       },
@@ -52,9 +54,8 @@ class RecommendedCard extends StatelessWidget {
           crossAxisAlignment:
               CrossAxisAlignment.start,
           children: [
-
             Container(
-              height: 100,
+              height: 90,
               width: double.infinity,
               decoration: const BoxDecoration(
                 color: Color(0xFFFFE0D6),
@@ -78,7 +79,6 @@ class RecommendedCard extends StatelessWidget {
                 crossAxisAlignment:
                     CrossAxisAlignment.start,
                 children: [
-
                   Text(
                     title,
                     maxLines: 1,
@@ -91,7 +91,7 @@ class RecommendedCard extends StatelessWidget {
                     ),
                   ),
 
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 4),
 
                   Text(
                     "⭐ $rating",
@@ -113,11 +113,10 @@ class RecommendedCard extends StatelessWidget {
                     ),
                   ),
 
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
 
                   Row(
                     children: [
-
                       Text(
                         time,
                         style: const TextStyle(
@@ -127,8 +126,6 @@ class RecommendedCard extends StatelessWidget {
                       ),
 
                       const Spacer(),
-
-                     
                     ],
                   ),
                 ],
