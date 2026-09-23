@@ -25,6 +25,12 @@ const openaiApiKey =
 exports.onOrderCreated =
     orderNotifications.onOrderCreated;
 
+const soldQuantity =
+    require("./notifications/soldQuantity");
+
+exports.updateSoldQuantity =
+    soldQuantity.updateSoldQuantity;
+
 exports.jambooAI = onCall(
     {
       secrets: [openaiApiKey],
@@ -164,6 +170,8 @@ exports.jambooAI = onCall(
                 data.emoji || "🍽️",
             preparationTime:
                 Number(data.preparationTime || 20),
+            soldQuantity:
+                Number(data.soldQuantity || 0),
           });
         });
 
@@ -176,42 +184,6 @@ exports.jambooAI = onCall(
             recommendations: [],
           };
         }
-
-        const ordersSnapshot = await db
-            .collection("orders")
-            .where(
-                "orderStatus",
-                "==",
-                "Delivered",
-            )
-            .get();
-
-        const salesCount = {};
-
-        ordersSnapshot.docs.forEach((orderDoc) => {
-          const orderData = orderDoc.data();
-          const items = orderData.items;
-
-          if (!Array.isArray(items)) {
-            return;
-          }
-
-          items.forEach((item) => {
-            const itemId =
-                (item.id || "").toString();
-
-            if (!itemId) {
-              return;
-            }
-
-            const quantity =
-                Number(item.quantity || 0);
-
-            salesCount[itemId] =
-                (salesCount[itemId] || 0) +
-                quantity;
-          });
-        });
 
         const userMessage =
             message.trim().toLowerCase();
@@ -283,10 +255,10 @@ exports.jambooAI = onCall(
 
         candidates.sort((a, b) => {
           const salesA =
-              salesCount[a.id] || 0;
+              a.soldQuantity || 0;
 
           const salesB =
-              salesCount[b.id] || 0;
+              b.soldQuantity || 0;
 
           const ratingA =
               a.rating > 0 ?
@@ -338,7 +310,7 @@ exports.jambooAI = onCall(
         const candidateText =
             recommendations.map((item) => {
               const sold =
-                  salesCount[item.id] || 0;
+                  item.soldQuantity || 0;
 
               return [
                 `Item ID: ${item.id}`,
@@ -366,7 +338,7 @@ exports.jambooAI = onCall(
 
         const response =
             await openai.responses.create({
-              model: "gpt-5",
+              model: "gpt-5.6-luna",
               instructions:
                   "You are Jamboo AI, the food " +
                   "recommendation assistant inside " +
@@ -403,9 +375,10 @@ exports.jambooAI = onCall(
         return {
           success: true,
           reply:
-              response.output_text ||
-              "Sorry, mujhe abhi recommendation " +
-              "nahi mil paayi.",
+    (response.output_text ||
+      "Sorry, mujhe abhi recommendation " +
+      "nahi mil paayi.")
+        .replace(/\*\*/g, ""),
           recommendations:
               recommendations.map((item) => ({
                 id: item.id,
@@ -426,7 +399,7 @@ exports.jambooAI = onCall(
                 preparationTime:
                     item.preparationTime,
                 soldQuantity:
-                    salesCount[item.id] || 0,
+                    item.soldQuantity || 0,
               })),
         };
       } catch (error) {
@@ -443,6 +416,7 @@ exports.jambooAI = onCall(
       }
     },
 );
+
 // ============================================================
 // DELETE CUSTOMER ACCOUNT
 // ============================================================
@@ -462,10 +436,10 @@ exports.deleteCustomerAccount = onCall(
       const uid = request.auth.uid;
 
       try {
-      // --------------------------------------------------------
-      // 1. Get customer ratings before deleting them
-      //    so restaurant averages can be recalculated.
-      // --------------------------------------------------------
+        // --------------------------------------------------------
+        // 1. Get customer ratings before deleting them
+        //    so restaurant averages can be recalculated.
+        // --------------------------------------------------------
 
         const ratingsSnapshot = await db
             .collection("ratings")

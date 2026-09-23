@@ -46,10 +46,17 @@ class _PaymentScreenState extends State<PaymentScreen> {
 
     if (!mounted) return;
 
-    setState(() {});
+    setState(() {
+      if (!BillingService.codEnabled &&
+          selectedPayment == "COD") {
+        selectedPayment = "UPI";
+      }
+    });
   }
 
-  bool _isValidAddress(Map<String, dynamic>? address) {
+  bool _isValidAddress(
+    Map<String, dynamic>? address,
+  ) {
     if (address == null) {
       return false;
     }
@@ -96,7 +103,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
       builder: (dialogContext) {
         return AlertDialog(
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
+            borderRadius:
+                BorderRadius.circular(20),
           ),
           title: const Row(
             children: [
@@ -127,17 +135,21 @@ class _PaymentScreenState extends State<PaymentScreen> {
               onPressed: () {
                 Navigator.pop(dialogContext);
               },
-              child: const Text(
-                "Cancel",
-              ),
+              child: const Text("Cancel"),
             ),
             ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.deepPurple,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
+              style:
+                  ElevatedButton.styleFrom(
+                backgroundColor:
+                    Colors.deepPurple,
+                foregroundColor:
+                    Colors.white,
+                shape:
+                    RoundedRectangleBorder(
                   borderRadius:
-                      BorderRadius.circular(10),
+                      BorderRadius.circular(
+                    10,
+                  ),
                 ),
               ),
               onPressed: () {
@@ -163,40 +175,204 @@ class _PaymentScreenState extends State<PaymentScreen> {
     );
   }
 
-  Future<Map<String, dynamic>?> _getSelectedAddress(
-  String uid,
-) async {
-  final snapshot =
-      await FirebaseFirestore.instance
-          .collection("users")
-          .doc(uid)
-          .collection("addresses")
-          .where(
-            "selectedForCheckout",
-            isEqualTo: true,
-          )
-          .limit(1)
-          .get();
+  Future<void> _showServiceabilityPopup(
+    double distanceKm,
+  ) async {
+    if (!mounted) return;
 
-  if (snapshot.docs.isEmpty) {
-    return null;
+    await showDialog(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius:
+                BorderRadius.circular(20),
+          ),
+          title: const Row(
+            children: [
+              Icon(
+                Icons.location_off,
+                color: Colors.redAccent,
+              ),
+              SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  "Delivery Not Available",
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: Text(
+            "This restaurant is ${distanceKm.toStringAsFixed(1)} km "
+            "away and is outside our current delivery area.",
+            style: const TextStyle(
+              fontSize: 15,
+              height: 1.4,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(dialogContext);
+              },
+              child: const Text("OK"),
+            ),
+          ],
+        );
+      },
+    );
   }
 
-  final data = snapshot.docs.first.data();
+  Future<void> _showCodUnavailablePopup() async {
+    if (!mounted) return;
 
-  return {
-    "fullName": data["fullName"] ?? "",
-    "phone": data["phone"] ?? "",
-    "address": data["address"] ?? "",
-    "landmark": data["landmark"] ?? "",
-    "city": data["city"] ?? "",
-    "state": data["state"] ?? "",
-    "pincode": data["pincode"] ?? "",
-    "type": data["type"] ?? "",
-    "latitude": (data["latitude"] ?? 0).toDouble(),
-    "longitude": (data["longitude"] ?? 0).toDouble(),
-  };
-}
+    await showDialog(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius:
+                BorderRadius.circular(20),
+          ),
+          title: const Row(
+            children: [
+              Icon(
+                Icons.money_off,
+                color: Colors.orange,
+              ),
+              SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  "Cash on Delivery Unavailable",
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: const Text(
+            "Cash on Delivery is not currently available. Please select another payment method.",
+            style: TextStyle(
+              fontSize: 15,
+              height: 1.4,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(dialogContext);
+              },
+              child: const Text("OK"),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<Map<String, dynamic>?> _getSelectedAddress(
+    String uid,
+  ) async {
+    final snapshot =
+        await FirebaseFirestore.instance
+            .collection("users")
+            .doc(uid)
+            .collection("addresses")
+            .where(
+              "selectedForCheckout",
+              isEqualTo: true,
+            )
+            .limit(1)
+            .get();
+
+    if (snapshot.docs.isEmpty) {
+      return null;
+    }
+
+    final data =
+        snapshot.docs.first.data();
+
+    return {
+      "fullName":
+          data["fullName"] ?? "",
+      "phone":
+          data["phone"] ?? "",
+      "address":
+          data["address"] ?? "",
+      "landmark":
+          data["landmark"] ?? "",
+      "city":
+          data["city"] ?? "",
+      "state":
+          data["state"] ?? "",
+      "pincode":
+          data["pincode"] ?? "",
+      "type":
+          data["type"] ?? "",
+      "latitude":
+          (data["latitude"] ?? 0).toDouble(),
+      "longitude":
+          (data["longitude"] ?? 0).toDouble(),
+    };
+  }
+
+  Future<double?> _getDistanceKm({
+    required String restaurantId,
+    required Map<String, dynamic> address,
+  }) async {
+    final restaurantSnapshot =
+        await FirebaseFirestore.instance
+            .collection(
+              "restaurant_registrations",
+            )
+            .doc(restaurantId)
+            .get();
+
+    if (!restaurantSnapshot.exists) {
+      return null;
+    }
+
+    final restaurantData =
+        restaurantSnapshot.data() ?? {};
+
+    final restaurantLatitude =
+        (restaurantData["latitude"] as num?)
+            ?.toDouble();
+
+    final restaurantLongitude =
+        (restaurantData["longitude"] as num?)
+            ?.toDouble();
+
+    final customerLatitude =
+        (address["latitude"] as num?)
+            ?.toDouble();
+
+    final customerLongitude =
+        (address["longitude"] as num?)
+            ?.toDouble();
+
+    if (restaurantLatitude == null ||
+        restaurantLongitude == null ||
+        customerLatitude == null ||
+        customerLongitude == null) {
+      return null;
+    }
+
+    return BillingService.calculateDistanceKm(
+      restaurantLatitude:
+          restaurantLatitude,
+      restaurantLongitude:
+          restaurantLongitude,
+      customerLatitude:
+          customerLatitude,
+      customerLongitude:
+          customerLongitude,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -241,10 +417,12 @@ class _PaymentScreenState extends State<PaymentScreen> {
             )
             .limit(1)
             .snapshots(),
-        builder: (context, addressSnapshot) {
+        builder:
+            (context, addressSnapshot) {
           if (!addressSnapshot.hasData) {
             return const Center(
-              child: CircularProgressIndicator(),
+              child:
+                  CircularProgressIndicator(),
             );
           }
 
@@ -256,10 +434,10 @@ class _PaymentScreenState extends State<PaymentScreen> {
               .isNotEmpty) {
             address =
                 addressSnapshot
-                    .data!
-                    .docs
-                    .first
-                    .data()
+                        .data!
+                        .docs
+                        .first
+                        .data()
                     as Map<String, dynamic>;
           }
 
@@ -267,11 +445,14 @@ class _PaymentScreenState extends State<PaymentScreen> {
               _isValidAddress(address);
 
           return StreamBuilder<QuerySnapshot>(
-            stream: _cartService.cartStream(),
-            builder: (context, cartSnapshot) {
+            stream:
+                _cartService.cartStream(),
+            builder:
+                (context, cartSnapshot) {
               if (!cartSnapshot.hasData) {
                 return const Center(
-                  child: CircularProgressIndicator(),
+                  child:
+                      CircularProgressIndicator(),
                 );
               }
 
@@ -284,7 +465,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
                     "Your cart is empty",
                     style: TextStyle(
                       fontSize: 18,
-                      fontWeight: FontWeight.bold,
+                      fontWeight:
+                          FontWeight.bold,
                     ),
                   ),
                 );
@@ -292,492 +474,99 @@ class _PaymentScreenState extends State<PaymentScreen> {
 
               double subtotal = 0;
 
+              String restaurantId = "";
+
               for (final doc in cartDocs) {
                 final data =
                     doc.data()
-                        as Map<String, dynamic>;
+                        as Map<String,
+                            dynamic>;
 
                 subtotal +=
                     ((data["price"] as num)
                             .toDouble()) *
                         ((data["quantity"] as num)
                             .toInt());
+
+                if (restaurantId.isEmpty) {
+                  restaurantId =
+                      (data["restaurantId"] ??
+                              "")
+                          .toString();
+                }
               }
 
-              final bill =
-                  BillingService.calculateBill(
-                itemsTotal: subtotal,
-                couponDiscount:
-                    widget.couponApplied
-                        ? widget.couponDiscount
-                        : 0,
-                couponCode: widget.couponCode,
-              );
+              if (!hasValidAddress ||
+                  restaurantId.isEmpty) {
+                return _buildPaymentContent(
+                  context: context,
+                  address: address,
+                  hasValidAddress:
+                      hasValidAddress,
+                  subtotal: subtotal,
+                  cartDocs: cartDocs,
+                  restaurantId:
+                      restaurantId,
+                  distanceKm: null,
+                  bill: null,
+                  uid: uid,
+                );
+              }
 
-              return SingleChildScrollView(
-                padding:
-                    const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment:
-                      CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      width: double.infinity,
-                      padding:
-                          const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius:
-                            BorderRadius.circular(16),
-                      ),
-                      child: Column(
-                        crossAxisAlignment:
-                            CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.location_on,
-                                color:
-                                    hasValidAddress
-                                        ? Colors
-                                            .deepPurple
-                                        : Colors
-                                            .redAccent,
-                              ),
-                              const SizedBox(
-                                width: 8,
-                              ),
-                              const Text(
-                                "Deliver To",
-                                style: TextStyle(
-                                  fontWeight:
-                                      FontWeight.bold,
-                                  fontSize: 16,
-                                ),
-                              ),
-                            ],
-                          ),
-
-                          const SizedBox(height: 10),
-
-                          if (hasValidAddress) ...[
-                            Text(
-                              address!["fullName"]
-                                      ?.toString() ??
-                                  "",
-                              style:
-                                  const TextStyle(
-                                fontWeight:
-                                    FontWeight.bold,
-                              ),
-                            ),
-                            Text(
-                              address["phone"]
-                                      ?.toString() ??
-                                  "",
-                            ),
-                            const SizedBox(
-                              height: 5,
-                            ),
-                            Text(
-                              address["address"]
-                                      ?.toString() ??
-                                  "",
-                            ),
-                            Text(
-                              "${address["city"]}, "
-                              "${address["state"]} - "
-                              "${address["pincode"]}",
-                            ),
-                          ] else ...[
-                            const Text(
-                              "No delivery address selected",
-                              style: TextStyle(
-                                color:
-                                    Colors.redAccent,
-                                fontWeight:
-                                    FontWeight.bold,
-                              ),
-                            ),
-                            const SizedBox(
-                              height: 6,
-                            ),
-                            const Text(
-                              "Please add a delivery address to place your order.",
-                              style: TextStyle(
-                                color: Colors.grey,
-                              ),
-                            ),
-                            const SizedBox(
-                              height: 8,
-                            ),
-                            TextButton(
-                              onPressed: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) =>
-                                        const SavedAddressesScreen(
-                                      isCheckoutMode:
-                                          true,
-                                    ),
-                                  ),
-                                );
-                              },
-                              child: const Text(
-                                "Add / Select Address",
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-
-                    const SizedBox(height: 20),
-
-                    const Text(
-                      "Payment Method",
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight:
-                            FontWeight.bold,
-                      ),
-                    ),
-
-                    const SizedBox(height: 10),
-
-                    paymentTile(
-                      "Cash on Delivery",
-                      "COD",
-                      Icons.money,
-                    ),
-
-                    paymentTile(
-                      "UPI",
-                      "UPI",
-                      Icons.account_balance,
-                    ),
-
-                    paymentTile(
-                      "Credit / Debit Card",
-                      "CARD",
-                      Icons.credit_card,
-                    ),
-
-                    paymentTile(
-                      "Wallet",
-                      "WALLET",
-                      Icons
-                          .account_balance_wallet,
-                    ),
-
-                    const SizedBox(height: 20),
-
-                    Container(
-                      padding:
-                          const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius:
-                            BorderRadius.circular(16),
-                      ),
-                      child: Column(
-                        children: [
-                          summaryRow(
-                            "Item Total",
-                            bill.itemsTotal,
-                          ),
-                          summaryRow(
-                            "Delivery Fee",
-                            bill.deliveryFee,
-                          ),
-                          summaryRow(
-                            "Platform Fee",
-                            bill.platformFee,
-                          ),
-                          summaryRow(
-                            "Discount",
-                            -bill.couponDiscount,
-                          ),
-                          const Divider(),
-                          summaryRow(
-                            "Grand Total",
-                            bill.grandTotal,
-                            isBold: true,
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    const SizedBox(height: 30),
-
-                    SizedBox(
-                      width: double.infinity,
-                      height: 55,
-                      child: ElevatedButton(
-                        onPressed:
-                            isLoading ||
-                                    !hasValidAddress
-                                ? null
-                                : () async {
-                                    setState(() {
-                                      isLoading =
-                                          true;
-                                    });
-
-                                    try {
-                                      // Final address
-                                      // verification before
-                                      // creating the order.
-                                      final latestAddress =
-                                          await _getSelectedAddress(
-                                        uid,
-                                      );
-
-                                      if (!_isValidAddress(
-                                        latestAddress,
-                                      )) {
-                                        await _showAddressRequiredPopup();
-                                        return;
-                                      }
-
-                                      final orderId =
-                                          FirebaseFirestore
-                                              .instance
-                                              .collection(
-                                                "orders",
-                                              )
-                                              .doc()
-                                              .id;
-
-                                      final orderNumber =
-                                          "JMB${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}";
-
-                                      final List<
-                                              Map<String,
-                                                  dynamic>>
-                                          items = [];
-
-                                      String restaurantId =
-                                          "";
-                                      String restaurantName =
-                                          "";
-
-                                      for (final doc
-                                          in cartDocs) {
-                                        final data =
-                                            doc.data()
-                                                as Map<
-                                                    String,
-                                                    dynamic>;
-
-                                        items.add(data);
-
-                                        restaurantId =
-                                            data[
-                                                    "restaurantId"] ??
-                                                "";
-
-                                        restaurantName =
-                                            data[
-                                                    "restaurantName"] ??
-                                                "";
-                                      }
-
-                                      final userDoc =
-                                          await FirebaseFirestore
-                                              .instance
-                                              .collection(
-                                                "users",
-                                              )
-                                              .doc(uid)
-                                              .get();
-
-                                      final userData =
-                                          userDoc.data() ??
-                                              {};
-
-                                      final restaurantDoc =
-                                          await FirebaseFirestore
-                                              .instance
-                                              .collection(
-                                                "restaurant_registrations",
-                                              )
-                                              .doc(
-                                                restaurantId,
-                                              )
-                                              .get();
-
-                                      final restaurantData =
-                                          restaurantDoc
-                                                  .data() ??
-                                              {};
-
-                                      final restaurantAddress =
-                                          restaurantData[
-                                                  "address"] ??
-                                              "";
-
-                                      final restaurantLatitude =
-                                          (restaurantData[
-                                                      "latitude"] ??
-                                                  0)
-                                              .toDouble();
-
-                                      final restaurantLongitude =
-                                          (restaurantData[
-                                                      "longitude"] ??
-                                                  0)
-                                              .toDouble();
-
-                                      final customerLongitude =
-                                          (latestAddress![
-                                                      "longitude"] ??
-                                                  0)
-                                              .toDouble();
-
-                                      final customerLatitude =
-                                          (latestAddress[
-                                                      "latitude"] ??
-                                                  0)
-                                              .toDouble();
-
-                                      final order =
-                                          OrderModel(
-                                        orderId: orderId,
-                                        orderNumber:
-                                            orderNumber,
-                                        userId: uid,
-                                        customerName:
-                                            userData[
-                                                    "fullName"] ??
-                                                "",
-                                        customerPhone:
-                                            userData[
-                                                    "phone"] ??
-                                                "",
-                                        deliveryPartnerId:
-                                            "",
-                                        deliveryPartnerName:
-                                            "",
-                                        deliveryPartnerPhone:
-                                            "",
-                                        vehicleNumber:
-                                            "",
-                                        restaurantId:
-                                            restaurantId,
-                                        restaurantName:
-                                            restaurantName,
-                                        restaurantAddress:
-                                            restaurantAddress,
-                                        restaurantLatitude:
-                                            restaurantLatitude,
-                                        restaurantLongitude:
-                                            restaurantLongitude,
-                                        items: items,
-                                        deliveryAddress:
-                                            latestAddress,
-                                        customerLatitude:
-                                            customerLatitude,
-                                        customerLongitude:
-                                            customerLongitude,
-                                        paymentMethod:
-                                            selectedPayment,
-                                        paymentStatus:
-                                            "Pending",
-                                        orderStatus:
-                                            "Pending",
-                                        subtotal:
-                                            subtotal,
-                                        deliveryFee:
-                                            bill.deliveryFee,
-                                        platformFee:
-                                            bill.platformFee,
-                                        discount:
-                                            bill.couponDiscount,
-                                        totalAmount:
-                                            bill.grandTotal,
-                                        createdAt:
-                                            DateTime.now(),
-                                      );
-
-                                      await _orderService
-                                          .placeOrder(
-                                        order,
-                                        couponCode:
-                                            widget.couponApplied
-                                                ? widget
-                                                    .couponCode
-                                                : null,
-                                      );
-
-                                      await _cartService
-                                          .clearCart();
-
-                                      if (!mounted) {
-                                        return;
-                                      }
-
-                                      Navigator
-                                          .pushReplacement(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (_) =>
-                                              OrderDetailsScreen(
-                                            order: order,
-                                          ),
-                                        ),
-                                      );
-                                    } catch (e) {
-                                      if (!mounted) {
-                                        return;
-                                      }
-
-                                      ScaffoldMessenger
-                                          .of(context)
-                                          .showSnackBar(
-                                        SnackBar(
-                                          content:
-                                              Text(
-                                            e.toString(),
-                                          ),
-                                        ),
-                                      );
-                                    } finally {
-                                      if (mounted) {
-                                        setState(() {
-                                          isLoading =
-                                              false;
-                                        });
-                                      }
-                                    }
-                                  },
-                        style:
-                            ElevatedButton.styleFrom(
-                          backgroundColor:
-                              Colors.deepPurple,
-                          foregroundColor:
-                              Colors.white,
-                          disabledBackgroundColor:
-                              Colors.grey.shade400,
-                        ),
-                        child: isLoading
-                            ? const CircularProgressIndicator(
-                                color: Colors.white,
-                              )
-                            : const Text(
-                                "Place Order",
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight:
-                                      FontWeight.bold,
-                                ),
-                              ),
-                      ),
-                    ),
-                  ],
+              return FutureBuilder<double?>(
+                future: _getDistanceKm(
+                  restaurantId:
+                      restaurantId,
+                  address: address!,
                 ),
+                builder: (
+                  context,
+                  distanceSnapshot,
+                ) {
+                  final double? distanceKm =
+                      distanceSnapshot.data;
+
+                  if (distanceSnapshot
+                          .connectionState ==
+                      ConnectionState.waiting) {
+                    return const Center(
+                      child:
+                          CircularProgressIndicator(),
+                    );
+                  }
+
+                  final bill =
+                      distanceKm == null
+                          ? null
+                          : BillingService
+                              .calculateBill(
+                              itemsTotal:
+                                  subtotal,
+                              couponDiscount:
+                                  widget.couponApplied
+                                      ? widget
+                                          .couponDiscount
+                                      : 0,
+                              couponCode:
+                                  widget.couponCode,
+                              distanceKm:
+                                  distanceKm,
+                            );
+
+                  return _buildPaymentContent(
+                    context: context,
+                    address: address,
+                    hasValidAddress:
+                        hasValidAddress,
+                    subtotal: subtotal,
+                    cartDocs: cartDocs,
+                    restaurantId:
+                        restaurantId,
+                    distanceKm: distanceKm,
+                    bill: bill,
+                    uid: uid,
+                  );
+                },
               );
             },
           );
@@ -786,31 +575,735 @@ class _PaymentScreenState extends State<PaymentScreen> {
     );
   }
 
+  Widget _buildPaymentContent({
+    required BuildContext context,
+    required Map<String, dynamic>? address,
+    required bool hasValidAddress,
+    required double subtotal,
+    required List<QueryDocumentSnapshot>
+        cartDocs,
+    required String restaurantId,
+    required double? distanceKm,
+    required dynamic bill,
+    required String uid,
+  }) {
+    final bool isServiceable =
+        distanceKm != null &&
+        BillingService.isWithinServiceableRadius(
+          distanceKm,
+        );
+
+    return SingleChildScrollView(
+      padding:
+          const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment:
+            CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: double.infinity,
+            padding:
+                const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius:
+                  BorderRadius.circular(16),
+            ),
+            child: Column(
+              crossAxisAlignment:
+                  CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.location_on,
+                      color:
+                          hasValidAddress
+                              ? Colors
+                                  .deepPurple
+                              : Colors
+                                  .redAccent,
+                    ),
+                    const SizedBox(
+                        width: 8),
+                    const Text(
+                      "Deliver To",
+                      style:
+                          TextStyle(
+                        fontWeight:
+                            FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                if (hasValidAddress) ...[
+                  Text(
+                    address!["fullName"]
+                            ?.toString() ??
+                        "",
+                    style:
+                        const TextStyle(
+                      fontWeight:
+                          FontWeight.bold,
+                    ),
+                  ),
+                  Text(
+                    address["phone"]
+                            ?.toString() ??
+                        "",
+                  ),
+                  const SizedBox(
+                      height: 5),
+                  Text(
+                    address["address"]
+                            ?.toString() ??
+                        "",
+                  ),
+                  Text(
+                    "${address["city"]}, "
+                    "${address["state"]} - "
+                    "${address["pincode"]}",
+                  ),
+                ] else ...[
+                  const Text(
+                    "No delivery address selected",
+                    style:
+                        TextStyle(
+                      color:
+                          Colors.redAccent,
+                      fontWeight:
+                          FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(
+                      height: 6),
+                  const Text(
+                    "Please add a delivery address to place your order.",
+                    style:
+                        TextStyle(
+                      color: Colors.grey,
+                    ),
+                  ),
+                  const SizedBox(
+                      height: 8),
+                  TextButton(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              const SavedAddressesScreen(
+                            isCheckoutMode:
+                                true,
+                          ),
+                        ),
+                      );
+                    },
+                    child: const Text(
+                      "Add / Select Address",
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 20),
+
+          if (distanceKm != null)
+            Container(
+              width: double.infinity,
+              margin:
+                  const EdgeInsets.only(
+                bottom: 20,
+              ),
+              padding:
+                  const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: isServiceable
+                    ? Colors.white
+                    : Colors.red.shade50,
+                borderRadius:
+                    BorderRadius.circular(14),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    isServiceable
+                        ? Icons.route
+                        : Icons.location_off,
+                    color: isServiceable
+                        ? Colors.deepPurple
+                        : Colors.redAccent,
+                  ),
+                  const SizedBox(
+                      width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment:
+                          CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          "Delivery Distance",
+                          style: TextStyle(
+                            fontWeight:
+                                FontWeight.bold,
+                            color:
+                                isServiceable
+                                    ? Colors
+                                        .black
+                                    : Colors
+                                        .redAccent,
+                          ),
+                        ),
+                        const SizedBox(
+                            height: 3),
+                        Text(
+                          "${distanceKm.toStringAsFixed(1)} km",
+                          style:
+                              const TextStyle(
+                            color: Colors.grey,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (!isServiceable)
+                    const Text(
+                      "Not serviceable",
+                      style: TextStyle(
+                        color:
+                            Colors.redAccent,
+                        fontWeight:
+                            FontWeight.bold,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+
+          const Text(
+            "Payment Method",
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight:
+                  FontWeight.bold,
+            ),
+          ),
+
+          const SizedBox(height: 10),
+
+          paymentTile(
+            "Cash on Delivery",
+            "COD",
+            Icons.money,
+            enabled:
+                BillingService.codEnabled,
+            unavailableMessage:
+                "Cash on Delivery is not currently available",
+          ),
+
+          paymentTile(
+            "UPI",
+            "UPI",
+            Icons.account_balance,
+          ),
+
+          paymentTile(
+            "Credit / Debit Card",
+            "CARD",
+            Icons.credit_card,
+          ),
+
+          paymentTile(
+            "Wallet",
+            "WALLET",
+            Icons.account_balance_wallet,
+          ),
+
+          const SizedBox(height: 20),
+
+          if (bill != null)
+            Container(
+              padding:
+                  const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius:
+                    BorderRadius.circular(16),
+              ),
+              child: Column(
+                children: [
+                  summaryRow(
+                    "Item Total",
+                    bill.itemsTotal,
+                  ),
+                  summaryRow(
+                    "Delivery Fee",
+                    bill.deliveryFee,
+                  ),
+                  if (bill.longDistanceCharge >
+                      0)
+                    summaryRow(
+                      "Long Distance Charge",
+                      bill.longDistanceCharge,
+                    ),
+                  summaryRow(
+                    "Platform Fee",
+                    bill.platformFee,
+                  ),
+                  summaryRow(
+                    "Discount",
+                    -bill.couponDiscount,
+                  ),
+                  const Divider(),
+                  summaryRow(
+                    "Grand Total",
+                    bill.grandTotal,
+                    isBold: true,
+                  ),
+                ],
+              ),
+            ),
+
+          if (bill == null &&
+              hasValidAddress)
+            Container(
+              width: double.infinity,
+              padding:
+                  const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.red.shade50,
+                borderRadius:
+                    BorderRadius.circular(14),
+              ),
+              child: const Text(
+                "Unable to calculate the delivery charge. Please try again.",
+                style: TextStyle(
+                  color: Colors.redAccent,
+                  fontWeight:
+                      FontWeight.w600,
+                ),
+              ),
+            ),
+
+          const SizedBox(height: 30),
+
+          SizedBox(
+            width: double.infinity,
+            height: 55,
+            child: ElevatedButton(
+              onPressed:
+                  isLoading ||
+                          !hasValidAddress ||
+                          bill == null ||
+                          distanceKm == null ||
+                          !isServiceable
+                      ? null
+                      : () async {
+                          if (selectedPayment ==
+                                  "COD" &&
+                              !BillingService
+                                  .codEnabled) {
+                            await _showCodUnavailablePopup();
+                            return;
+                          }
+
+                          setState(() {
+                            isLoading = true;
+                          });
+
+                          try {
+                            final latestAddress =
+                                await _getSelectedAddress(
+                              uid,
+                            );
+
+                            if (!_isValidAddress(
+                              latestAddress,
+                            )) {
+                              await _showAddressRequiredPopup();
+                              return;
+                            }
+
+                            final latestDistance =
+                                await _getDistanceKm(
+                              restaurantId:
+                                  restaurantId,
+                              address:
+                                  latestAddress!,
+                            );
+
+                            if (latestDistance ==
+                                null) {
+                              throw Exception(
+                                "Unable to calculate delivery distance.",
+                              );
+                            }
+
+                            if (!BillingService
+                                .isWithinServiceableRadius(
+                              latestDistance,
+                            )) {
+                              await _showServiceabilityPopup(
+                                latestDistance,
+                              );
+                              return;
+                            }
+
+                            if (selectedPayment ==
+                                    "COD" &&
+                                !BillingService
+                                    .codEnabled) {
+                              await _showCodUnavailablePopup();
+                              return;
+                            }
+
+                            final finalBill =
+                                BillingService
+                                    .calculateBill(
+                              itemsTotal:
+                                  subtotal,
+                              couponDiscount:
+                                  widget.couponApplied
+                                      ? widget
+                                          .couponDiscount
+                                      : 0,
+                              couponCode:
+                                  widget.couponCode,
+                              distanceKm:
+                                  latestDistance,
+                            );
+
+                            final orderId =
+                                FirebaseFirestore
+                                    .instance
+                                    .collection(
+                                      "orders",
+                                    )
+                                    .doc()
+                                    .id;
+
+                            final orderNumber =
+                                "JMB${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}";
+
+                            final List<
+                                    Map<String,
+                                        dynamic>>
+                                items = [];
+
+                            String finalRestaurantId =
+                                "";
+
+                            String finalRestaurantName =
+                                "";
+
+                            for (final doc
+                                in cartDocs) {
+                              final data =
+                                  doc.data()
+                                      as Map<
+                                          String,
+                                          dynamic>;
+
+                              items.add(data);
+
+                              finalRestaurantId =
+                                  data[
+                                          "restaurantId"] ??
+                                      "";
+
+                              finalRestaurantName =
+                                  data[
+                                          "restaurantName"] ??
+                                      "";
+                            }
+
+                            final userDoc =
+                                await FirebaseFirestore
+                                    .instance
+                                    .collection(
+                                      "users",
+                                    )
+                                    .doc(uid)
+                                    .get();
+
+                            final userData =
+                                userDoc.data() ??
+                                    {};
+
+                            final restaurantDoc =
+                                await FirebaseFirestore
+                                    .instance
+                                    .collection(
+                                      "restaurant_registrations",
+                                    )
+                                    .doc(
+                                      finalRestaurantId,
+                                    )
+                                    .get();
+
+                            final restaurantData =
+                                restaurantDoc
+                                        .data() ??
+                                    {};
+
+                            final restaurantAddress =
+                                restaurantData[
+                                        "address"] ??
+                                    "";
+
+                            final restaurantLatitude =
+                                (restaurantData[
+                                            "latitude"] ??
+                                        0)
+                                    .toDouble();
+
+                            final restaurantLongitude =
+                                (restaurantData[
+                                            "longitude"] ??
+                                        0)
+                                    .toDouble();
+
+                            final customerLatitude =
+                                (latestAddress[
+                                            "latitude"] ??
+                                        0)
+                                    .toDouble();
+
+                            final customerLongitude =
+                                (latestAddress[
+                                            "longitude"] ??
+                                        0)
+                                    .toDouble();
+
+                            final order =
+                                OrderModel(
+                              orderId: orderId,
+                              orderNumber:
+                                  orderNumber,
+                              userId: uid,
+                              customerName:
+                                  userData[
+                                          "fullName"] ??
+                                      "",
+                              customerPhone:
+                                  userData[
+                                          "phone"] ??
+                                      "",
+                              deliveryPartnerId:
+                                  "",
+                              deliveryPartnerName:
+                                  "",
+                              deliveryPartnerPhone:
+                                  "",
+                              vehicleNumber:
+                                  "",
+                              restaurantId:
+                                  finalRestaurantId,
+                              restaurantName:
+                                  finalRestaurantName,
+                              restaurantAddress:
+                                  restaurantAddress,
+                              restaurantLatitude:
+                                  restaurantLatitude,
+                              restaurantLongitude:
+                                  restaurantLongitude,
+                              items: items,
+                              deliveryAddress:
+                                  latestAddress,
+                              customerLatitude:
+                                  customerLatitude,
+                              customerLongitude:
+                                  customerLongitude,
+                              paymentMethod:
+                                  selectedPayment,
+                              paymentStatus:
+                                  "Pending",
+                              orderStatus:
+                                  "Pending",
+                              subtotal:
+                                  subtotal,
+                              deliveryFee:
+                                  finalBill
+                                      .deliveryFee,
+                              longDistanceCharge:
+                                  finalBill
+                                      .longDistanceCharge,
+                              platformFee:
+                                  finalBill
+                                      .platformFee,
+                              discount:
+                                  finalBill
+                                      .couponDiscount,
+                              totalAmount:
+                                  finalBill
+                                      .grandTotal,
+                              createdAt:
+                                  DateTime.now(),
+                            );
+
+                            await _orderService
+                                .placeOrder(
+                              order,
+                              couponCode:
+                                  widget
+                                          .couponApplied
+                                      ? widget
+                                          .couponCode
+                                      : null,
+                            );
+
+                            await _cartService
+                                .clearCart();
+
+                            if (!mounted) {
+                              return;
+                            }
+
+                            Navigator
+                                .pushReplacement(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    OrderDetailsScreen(
+                                  order: order,
+                                ),
+                              ),
+                            );
+                          } catch (e) {
+                            if (!mounted) {
+                              return;
+                            }
+
+                            ScaffoldMessenger
+                                .of(context)
+                                .showSnackBar(
+                              SnackBar(
+                                content:
+                                    Text(
+                                  e.toString(),
+                                ),
+                              ),
+                            );
+                          } finally {
+                            if (mounted) {
+                              setState(() {
+                                isLoading =
+                                    false;
+                              });
+                            }
+                          }
+                        },
+              style:
+                  ElevatedButton.styleFrom(
+                backgroundColor:
+                    Colors.deepPurple,
+                foregroundColor:
+                    Colors.white,
+                disabledBackgroundColor:
+                    Colors.grey.shade400,
+              ),
+              child: isLoading
+                  ? const CircularProgressIndicator(
+                      color: Colors.white,
+                    )
+                  : const Text(
+                      "Place Order",
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight:
+                            FontWeight.bold,
+                      ),
+                    ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget paymentTile(
     String title,
     String value,
-    IconData icon,
-  ) {
+    IconData icon, {
+    bool enabled = true,
+    String? unavailableMessage,
+  }) {
+    final bool isSelected =
+        selectedPayment == value;
+
     return Container(
       margin:
-          const EdgeInsets.only(bottom: 12),
+          const EdgeInsets.only(
+        bottom: 12,
+      ),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: enabled
+            ? Colors.white
+            : Colors.grey.shade100,
         borderRadius:
             BorderRadius.circular(16),
+        border: Border.all(
+          color: isSelected &&
+                  enabled
+              ? Colors.deepPurple
+              : Colors.transparent,
+          width: 1.5,
+        ),
       ),
-      child: RadioListTile<String>(
-        value: value,
-        groupValue: selectedPayment,
-        onChanged: (value) {
-          setState(() {
-            selectedPayment = value!;
-          });
-        },
-        title: Text(title),
-        secondary: Icon(
-          icon,
-          color: Colors.deepPurple,
+      child: IgnorePointer(
+        ignoring: !enabled,
+        child: RadioListTile<String>(
+          value: value,
+          groupValue: selectedPayment,
+          onChanged: enabled
+              ? (newValue) {
+                  setState(() {
+                    selectedPayment =
+                        newValue!;
+                  });
+                }
+              : null,
+          title: Text(
+            title,
+            style: TextStyle(
+              color: enabled
+                  ? Colors.black
+                  : Colors.grey.shade600,
+              fontWeight:
+                  FontWeight.w600,
+            ),
+          ),
+          subtitle:
+              unavailableMessage !=
+                          null &&
+                      !enabled
+                  ? Padding(
+                      padding:
+                          const EdgeInsets.only(
+                        top: 4,
+                      ),
+                      child: Text(
+                        unavailableMessage,
+                        style:
+                            TextStyle(
+                          color: Colors
+                              .grey
+                              .shade600,
+                          fontSize: 12,
+                        ),
+                      ),
+                    )
+                  : null,
+          secondary: Icon(
+            icon,
+            color: enabled
+                ? Colors.deepPurple
+                : Colors.grey,
+          ),
         ),
       ),
     );
@@ -832,9 +1325,10 @@ class _PaymentScreenState extends State<PaymentScreen> {
             child: Text(
               title,
               style: TextStyle(
-                fontWeight: isBold
-                    ? FontWeight.bold
-                    : FontWeight.normal,
+                fontWeight:
+                    isBold
+                        ? FontWeight.bold
+                        : FontWeight.normal,
                 fontSize:
                     isBold ? 16 : 14,
               ),
@@ -843,9 +1337,10 @@ class _PaymentScreenState extends State<PaymentScreen> {
           Text(
             "₹${amount.toStringAsFixed(2)}",
             style: TextStyle(
-              fontWeight: isBold
-                  ? FontWeight.bold
-                  : FontWeight.normal,
+              fontWeight:
+                  isBold
+                      ? FontWeight.bold
+                      : FontWeight.normal,
               fontSize:
                   isBold ? 16 : 14,
             ),

@@ -37,6 +37,7 @@ class OrderModel {
 
   final double subtotal;
   final double deliveryFee;
+  final double longDistanceCharge;
   final double platformFee;
   final double discount;
   final double totalAmount;
@@ -89,6 +90,7 @@ class OrderModel {
 
     required this.subtotal,
     required this.deliveryFee,
+    required this.longDistanceCharge,
     required this.platformFee,
     required this.discount,
     required this.totalAmount,
@@ -142,6 +144,7 @@ class OrderModel {
 
       "subtotal": subtotal,
       "deliveryFee": deliveryFee,
+      "longDistanceCharge": longDistanceCharge,
       "platformFee": platformFee,
       "discount": discount,
       "totalAmount": totalAmount,
@@ -234,6 +237,10 @@ class OrderModel {
 
       deliveryFee:
           (map["deliveryFee"] ?? 0)
+              .toDouble(),
+
+      longDistanceCharge:
+          (map["longDistanceCharge"] ?? 0)
               .toDouble(),
 
       platformFee:

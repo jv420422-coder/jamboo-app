@@ -25,6 +25,10 @@ class BusinessRulesService {
         'deliveryFee': 30.0,
         'platformFee': 10.0,
         'freeDeliveryAbove': 0.0,
+        'serviceableRadiusKm': 7.0,
+        'longDistanceFreeRadiusKm': 3.0,
+        'longDistanceCharge': 10.0,
+        'codEnabled': true,
       };
     }
 
@@ -32,21 +36,33 @@ class BusinessRulesService {
         snapshot.data() ?? {};
 
     return {
-      'deliveryFee':
-          _numberValue(
+      'deliveryFee': _numberValue(
         data['deliveryFee'],
         30.0,
       ),
-      'platformFee':
-          _numberValue(
+      'platformFee': _numberValue(
         data['platformFee'],
         10.0,
       ),
-      'freeDeliveryAbove':
-          _numberValue(
+      'freeDeliveryAbove': _numberValue(
         data['freeDeliveryAbove'],
         0.0,
       ),
+      'serviceableRadiusKm': _numberValue(
+        data['serviceableRadiusKm'],
+        7.0,
+      ),
+      'longDistanceFreeRadiusKm':
+          _numberValue(
+        data['longDistanceFreeRadiusKm'],
+        3.0,
+      ),
+      'longDistanceCharge': _numberValue(
+        data['longDistanceCharge'],
+        10.0,
+      ),
+      'codEnabled':
+          data['codEnabled'] as bool? ?? true,
     };
   }
 

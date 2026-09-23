@@ -20,7 +20,8 @@ class CartScreen extends StatefulWidget {
   const CartScreen({super.key});
 
   @override
-  State<CartScreen> createState() => _CartScreenState();
+  State<CartScreen> createState() =>
+      _CartScreenState();
 }
 
 class _CartScreenState extends State<CartScreen> {
@@ -340,7 +341,9 @@ class _CartScreenState extends State<CartScreen> {
     });
   }
 
-  bool _isValidAddress(Map<String, dynamic>? address) {
+  bool _isValidAddress(
+    Map<String, dynamic>? address,
+  ) {
     if (address == null) {
       return false;
     }
@@ -427,7 +430,8 @@ class _CartScreenState extends State<CartScreen> {
                 backgroundColor: Colors.deepPurple,
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius:
+                      BorderRadius.circular(10),
                 ),
               ),
               onPressed: () {
@@ -453,13 +457,122 @@ class _CartScreenState extends State<CartScreen> {
     );
   }
 
+  Future<void> _showServiceabilityPopup(
+    double distanceKm,
+  ) async {
+    if (!mounted) return;
+
+    await showDialog(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: const Row(
+            children: [
+              Icon(
+                Icons.location_off,
+                color: Colors.redAccent,
+              ),
+              SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  "Delivery Not Available",
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: Text(
+            "This restaurant is ${distanceKm.toStringAsFixed(1)} km "
+            "away and is outside our current delivery area.",
+            style: const TextStyle(
+              fontSize: 15,
+              height: 1.4,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(dialogContext);
+              },
+              child: const Text("OK"),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<double?> _getDistanceKm({
+    required String restaurantId,
+    required Map<String, dynamic>? address,
+  }) async {
+    if (!_isValidAddress(address)) {
+      return null;
+    }
+
+    final restaurantSnapshot =
+        await FirebaseFirestore.instance
+            .collection("restaurant_registrations")
+            .doc(restaurantId)
+            .get();
+
+    if (!restaurantSnapshot.exists) {
+      return null;
+    }
+
+    final restaurantData =
+        restaurantSnapshot.data() ?? {};
+
+    final restaurantLatitude =
+        (restaurantData["latitude"] as num?)
+            ?.toDouble();
+
+    final restaurantLongitude =
+        (restaurantData["longitude"] as num?)
+            ?.toDouble();
+
+    final customerLatitude =
+        (address?["latitude"] as num?)
+            ?.toDouble();
+
+    final customerLongitude =
+        (address?["longitude"] as num?)
+            ?.toDouble();
+
+    if (restaurantLatitude == null ||
+        restaurantLongitude == null ||
+        customerLatitude == null ||
+        customerLongitude == null) {
+      return null;
+    }
+
+    return BillingService.calculateDistanceKm(
+      restaurantLatitude:
+          restaurantLatitude,
+      restaurantLongitude:
+          restaurantLongitude,
+      customerLatitude:
+          customerLatitude,
+      customerLongitude:
+          customerLongitude,
+    );
+  }
+
   Future<void> _proceedToCheckout({
     required BuildContext context,
     required bool couponApplied,
     required String? couponCode,
     required double couponDiscount,
+    required String restaurantId,
+    required double distanceKm,
   }) async {
-    final user = FirebaseAuth.instance.currentUser;
+    final user =
+        FirebaseAuth.instance.currentUser;
 
     if (user == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -499,6 +612,15 @@ class _CartScreenState extends State<CartScreen> {
         return;
       }
 
+      if (!BillingService.isWithinServiceableRadius(
+        distanceKm,
+      )) {
+        await _showServiceabilityPopup(
+          distanceKm,
+        );
+        return;
+      }
+
       if (!context.mounted) return;
 
       Navigator.push(
@@ -511,7 +633,7 @@ class _CartScreenState extends State<CartScreen> {
           ),
         ),
       );
-    } catch (e) {
+    } catch (_) {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -552,7 +674,8 @@ class _CartScreenState extends State<CartScreen> {
 
           cartItems.add(item);
           totalItems += item.quantity;
-          itemsTotal += item.price * item.quantity;
+          itemsTotal +=
+              item.price * item.quantity;
         }
 
         final String? restaurantId =
@@ -582,16 +705,6 @@ class _CartScreenState extends State<CartScreen> {
             effectiveCouponApplied
                 ? couponDiscount
                 : 0;
-
-        final bill = BillingService.calculateBill(
-          itemsTotal: itemsTotal,
-          couponDiscount:
-              effectiveCouponDiscount,
-          couponCode:
-              effectiveCouponApplied
-                  ? appliedCoupon
-                  : null,
-        );
 
         final user =
             FirebaseAuth.instance.currentUser;
@@ -667,355 +780,649 @@ class _CartScreenState extends State<CartScreen> {
                     ],
                   ),
                 )
-              : SingleChildScrollView(
-                  child: Padding(
-                    padding:
-                        const EdgeInsets.all(20),
-                    child: Column(
-                      children: [
-                        StreamBuilder<QuerySnapshot>(
-                          stream:
-                              FirebaseFirestore
-                                  .instance
-                                  .collection("users")
-                                  .doc(uid)
-                                  .collection(
-                                      "addresses")
-                                  .where(
-                                    "selectedForCheckout",
-                                    isEqualTo: true,
+              : StreamBuilder<QuerySnapshot>(
+                  stream:
+                      FirebaseFirestore.instance
+                          .collection("users")
+                          .doc(uid)
+                          .collection("addresses")
+                          .where(
+                            "selectedForCheckout",
+                            isEqualTo: true,
+                          )
+                          .limit(1)
+                          .snapshots(),
+                  builder:
+                      (context, addressSnapshot) {
+                    if (!addressSnapshot.hasData) {
+                      return const Center(
+                        child:
+                            CircularProgressIndicator(),
+                      );
+                    }
+
+                    Map<String, dynamic>?
+                        address;
+
+                    if (addressSnapshot
+                        .data!
+                        .docs
+                        .isNotEmpty) {
+                      address =
+                          addressSnapshot
+                                  .data!
+                                  .docs
+                                  .first
+                                  .data()
+                              as Map<String,
+                                  dynamic>;
+                    }
+
+                    final bool hasValidAddress =
+                        address != null &&
+                        _isValidAddress(address);
+
+                    return FutureBuilder<double?>(
+                      future: restaurantId == null ||
+                              !hasValidAddress
+                          ? Future.value(null)
+                          : _getDistanceKm(
+                              restaurantId:
+                                  restaurantId,
+                              address: address,
+                            ),
+                      builder:
+                          (context, distanceSnapshot) {
+                        final bool distanceLoading =
+                            distanceSnapshot
+                                    .connectionState ==
+                                ConnectionState.waiting;
+
+                        final double? distanceKm =
+                            distanceSnapshot.data;
+
+                        final bool hasDistance =
+                            distanceKm != null;
+
+                        final bool isServiceable =
+                            hasDistance &&
+                            BillingService
+                                .isWithinServiceableRadius(
+                              distanceKm,
+                            );
+
+                        final bill =
+                            hasDistance
+                                ? BillingService
+                                    .calculateBill(
+                                    itemsTotal:
+                                        itemsTotal,
+                                    couponDiscount:
+                                        effectiveCouponDiscount,
+                                    couponCode:
+                                        effectiveCouponApplied
+                                            ? appliedCoupon
+                                            : null,
+                                    distanceKm:
+                                        distanceKm,
                                   )
-                                  .limit(1)
-                                  .snapshots(),
-                          builder:
-                              (context,
-                                  addressSnapshot) {
-                            if (!addressSnapshot
-                                .hasData) {
-                              return const Center(
-                                child:
-                                    CircularProgressIndicator(),
-                              );
-                            }
+                                : null;
 
-                            Map<String, dynamic>?
-                                address;
-
-                            if (addressSnapshot
-                                .data!
-                                .docs
-                                .isNotEmpty) {
-                              address =
-                                  addressSnapshot
-                                          .data!
-                                          .docs
-                                          .first
-                                          .data()
-                                      as Map<String,
-                                          dynamic>;
-                            }
-
-                            final bool hasValidAddress =
-                                address != null &&
-                                _isValidAddress(address);
-
-                            return Container(
-                              margin:
-                                  const EdgeInsets.only(
-                                bottom: 16,
-                              ),
-                              padding:
-                                  const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius:
-                                    BorderRadius.circular(
-                                  16,
-                                ),
-                              ),
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    Icons.location_on,
-                                    color:
-                                        hasValidAddress
-                                            ? Colors
-                                                .deepPurple
-                                            : Colors
-                                                .redAccent,
+                        return SingleChildScrollView(
+                          child: Padding(
+                            padding:
+                                const EdgeInsets.all(
+                              20,
+                            ),
+                            child: Column(
+                              children: [
+                                Container(
+                                  margin:
+                                      const EdgeInsets
+                                          .only(
+                                    bottom: 16,
                                   ),
-                                  const SizedBox(
-                                      width: 10),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment
-                                              .start,
+                                  padding:
+                                      const EdgeInsets
+                                          .all(
+                                    16,
+                                  ),
+                                  decoration:
+                                      BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius:
+                                        BorderRadius
+                                            .circular(
+                                      16,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        Icons.location_on,
+                                        color:
+                                            hasValidAddress
+                                                ? Colors
+                                                    .deepPurple
+                                                : Colors
+                                                    .redAccent,
+                                      ),
+                                      const SizedBox(
+                                          width: 10),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment
+                                                  .start,
+                                          children: [
+                                            const Text(
+                                              "Deliver To",
+                                              style:
+                                                  TextStyle(
+                                                color: Colors
+                                                    .grey,
+                                              ),
+                                            ),
+                                            const SizedBox(
+                                                height: 4),
+                                            if (address !=
+                                                    null &&
+                                                hasValidAddress) ...[
+                                              Text(
+                                                address[
+                                                        "fullName"] ??
+                                                    "",
+                                                style:
+                                                    const TextStyle(
+                                                  fontWeight:
+                                                      FontWeight
+                                                          .bold,
+                                                ),
+                                              ),
+                                              Text(
+                                                "${address["address"] ?? ""}\n"
+                                                "${address["city"] ?? ""}",
+                                              ),
+                                            ] else ...[
+                                              const Text(
+                                                "Add delivery address",
+                                                style:
+                                                    TextStyle(
+                                                  fontWeight:
+                                                      FontWeight
+                                                          .bold,
+                                                  color: Colors
+                                                      .redAccent,
+                                                ),
+                                              ),
+                                              const SizedBox(
+                                                  height: 2),
+                                              const Text(
+                                                "Required before checkout",
+                                                style:
+                                                    TextStyle(
+                                                  color:
+                                                      Colors.grey,
+                                                  fontSize:
+                                                      12,
+                                                ),
+                                              ),
+                                            ],
+                                          ],
+                                        ),
+                                      ),
+                                      TextButton(
+                                        onPressed: () {
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (_) =>
+                                                  const SavedAddressesScreen(
+                                                isCheckoutMode:
+                                                    true,
+                                              ),
+                                            ),
+                                          );
+                                        },
+                                        child: Text(
+                                          hasValidAddress
+                                              ? "Change"
+                                              : "Add",
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+
+                                if (hasValidAddress &&
+                                    distanceLoading)
+                                  Container(
+                                    width:
+                                        double.infinity,
+                                    margin:
+                                        const EdgeInsets
+                                            .only(
+                                      bottom: 16,
+                                    ),
+                                    padding:
+                                        const EdgeInsets
+                                            .all(
+                                      14,
+                                    ),
+                                    decoration:
+                                        BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius:
+                                          BorderRadius
+                                              .circular(
+                                        14,
+                                      ),
+                                    ),
+                                    child: const Row(
                                       children: [
-                                        const Text(
-                                          "Deliver To",
-                                          style: TextStyle(
-                                            color:
-                                                Colors.grey,
+                                        SizedBox(
+                                          width: 18,
+                                          height: 18,
+                                          child:
+                                              CircularProgressIndicator(
+                                            strokeWidth:
+                                                2,
                                           ),
                                         ),
-                                        const SizedBox(
-                                            height: 4),
-                                        if (address !=
-                                                null &&
-                                            hasValidAddress) ...[
-                                          Text(
-                                            address[
-                                                    "fullName"] ??
-                                                "",
-                                            style:
-                                                const TextStyle(
-                                              fontWeight:
-                                                  FontWeight
-                                                      .bold,
-                                            ),
-                                          ),
-                                          Text(
-                                            "${address["address"] ?? ""}\n"
-                                            "${address["city"] ?? ""}",
-                                          ),
-                                        ] else ...[
-                                          const Text(
-                                            "Add delivery address",
-                                            style:
-                                                TextStyle(
-                                              fontWeight:
-                                                  FontWeight
-                                                      .bold,
-                                              color: Colors
-                                                  .redAccent,
-                                            ),
-                                          ),
-                                          const SizedBox(
-                                              height: 2),
-                                          const Text(
-                                            "Required before checkout",
-                                            style:
-                                                TextStyle(
-                                              color:
-                                                  Colors.grey,
-                                              fontSize: 12,
-                                            ),
-                                          ),
-                                        ],
+                                        SizedBox(
+                                            width: 10),
+                                        Text(
+                                          "Calculating delivery distance...",
+                                        ),
                                       ],
                                     ),
                                   ),
-                                  TextButton(
-                                    onPressed: () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (_) =>
-                                              const SavedAddressesScreen(
-                                            isCheckoutMode:
-                                                true,
-                                          ),
-                                        ),
-                                      );
-                                    },
-                                    child: Text(
-                                      hasValidAddress
-                                          ? "Change"
-                                          : "Add",
+
+                                if (hasValidAddress &&
+                                    !distanceLoading &&
+                                    !hasDistance)
+                                  Container(
+                                    width:
+                                        double.infinity,
+                                    margin:
+                                        const EdgeInsets
+                                            .only(
+                                      bottom: 16,
                                     ),
-                                  ),
-                                ],
-                              ),
-                            );
-                          },
-                        ),
-
-                        ...cartItems.map(
-                          (item) => CartItemCard(
-                            item: item,
-                          ),
-                        ),
-
-                        const SizedBox(height: 4),
-
-                        Container(
-                          padding:
-                              const EdgeInsets.all(16),
-                          decoration:
-                              BoxDecoration(
-                            color: Colors.white,
-                            borderRadius:
-                                BorderRadius.circular(
-                              16,
-                            ),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(
-                                Icons.local_offer,
-                                color:
-                                    Colors.deepPurple,
-                              ),
-                              const SizedBox(
-                                width: 12,
-                              ),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment
-                                          .start,
-                                  children: [
-                                    const Text(
-                                      "Apply Coupon",
-                                      style:
-                                          TextStyle(
-                                        fontWeight:
-                                            FontWeight
-                                                .bold,
-                                        fontSize: 16,
+                                    padding:
+                                        const EdgeInsets
+                                            .all(
+                                      14,
+                                    ),
+                                    decoration:
+                                        BoxDecoration(
+                                      color:
+                                          Colors.red.shade50,
+                                      borderRadius:
+                                          BorderRadius
+                                              .circular(
+                                        14,
                                       ),
                                     ),
-                                    const SizedBox(
-                                      height: 4,
+                                    child: const Text(
+                                      "Unable to calculate delivery distance. "
+                                      "Please try again.",
+                                      style: TextStyle(
+                                        color: Colors
+                                            .redAccent,
+                                        fontWeight:
+                                            FontWeight
+                                                .w600,
+                                      ),
                                     ),
-                                    Text(
-                                      effectiveCouponApplied
-                                          ? "✅ $appliedCoupon Applied"
-                                          : "Apply an available coupon",
+                                  ),
+
+                                if (hasDistance)
+                                  Container(
+                                    width:
+                                        double.infinity,
+                                    margin:
+                                        const EdgeInsets
+                                            .only(
+                                      bottom: 16,
                                     ),
-                                    const SizedBox(
-                                      height: 4,
+                                    padding:
+                                        const EdgeInsets
+                                            .all(
+                                      14,
                                     ),
-                                    Text(
-                                      effectiveCouponApplied
-                                          ? "You saved ₹${effectiveCouponDiscount.toStringAsFixed(0)}"
-                                          : "Save more on your order",
+                                    decoration:
+                                        BoxDecoration(
+                                      color:
+                                          isServiceable
+                                              ? Colors
+                                                  .white
+                                              : Colors
+                                                  .red
+                                                  .shade50,
+                                      borderRadius:
+                                          BorderRadius
+                                              .circular(
+                                        14,
+                                      ),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          isServiceable
+                                              ? Icons
+                                                  .route
+                                              : Icons
+                                                  .location_off,
+                                          color:
+                                              isServiceable
+                                                  ? Colors
+                                                      .deepPurple
+                                                  : Colors
+                                                      .redAccent,
+                                        ),
+                                        const SizedBox(
+                                            width: 10),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment
+                                                    .start,
+                                            children: [
+                                              Text(
+                                                "Delivery Distance",
+                                                style:
+                                                    TextStyle(
+                                                  fontWeight:
+                                                      FontWeight
+                                                          .bold,
+                                                  color:
+                                                      isServiceable
+                                                          ? Colors
+                                                              .black
+                                                          : Colors
+                                                              .redAccent,
+                                                ),
+                                              ),
+                                              const SizedBox(
+                                                  height: 3),
+                                              Text(
+                                                "${distanceKm.toStringAsFixed(1)} km",
+                                                style:
+                                                    const TextStyle(
+                                                  color:
+                                                      Colors.grey,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        if (!isServiceable)
+                                          const Text(
+                                            "Not serviceable",
+                                            style:
+                                                TextStyle(
+                                              color: Colors
+                                                  .redAccent,
+                                              fontWeight:
+                                                  FontWeight
+                                                      .bold,
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                  ),
+
+                                ...cartItems.map(
+                                  (item) => CartItemCard(
+                                    item: item,
+                                  ),
+                                ),
+
+                                const SizedBox(
+                                    height: 4),
+
+                                Container(
+                                  padding:
+                                      const EdgeInsets
+                                          .all(
+                                    16,
+                                  ),
+                                  decoration:
+                                      BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius:
+                                        BorderRadius
+                                            .circular(
+                                      16,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      const Icon(
+                                        Icons.local_offer,
+                                        color: Colors
+                                            .deepPurple,
+                                      ),
+                                      const SizedBox(
+                                        width: 12,
+                                      ),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment
+                                                  .start,
+                                          children: [
+                                            const Text(
+                                              "Apply Coupon",
+                                              style:
+                                                  TextStyle(
+                                                fontWeight:
+                                                    FontWeight
+                                                        .bold,
+                                                fontSize:
+                                                    16,
+                                              ),
+                                            ),
+                                            const SizedBox(
+                                                height: 4),
+                                            Text(
+                                              effectiveCouponApplied
+                                                  ? "✅ $appliedCoupon Applied"
+                                                  : "Apply an available coupon",
+                                            ),
+                                            const SizedBox(
+                                                height: 4),
+                                            Text(
+                                              effectiveCouponApplied
+                                                  ? "You saved ₹${effectiveCouponDiscount.toStringAsFixed(0)}"
+                                                  : "Save more on your order",
+                                              style:
+                                                  const TextStyle(
+                                                color:
+                                                    Colors.grey,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      TextButton(
+                                        onPressed:
+                                            restaurantId ==
+                                                        null ||
+                                                    !hasDistance ||
+                                                    !isServiceable
+                                                ? null
+                                                : () async {
+                                                    if (effectiveCouponApplied) {
+                                                      _removeCoupon();
+                                                      return;
+                                                    }
+
+                                                    await _selectCoupon(
+                                                      context:
+                                                          context,
+                                                      restaurantId:
+                                                          restaurantId,
+                                                      itemsTotal:
+                                                          itemsTotal,
+                                                    );
+                                                  },
+                                        child: Text(
+                                          effectiveCouponApplied
+                                              ? "Remove"
+                                              : "View",
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+
+                                const SizedBox(
+                                    height: 18),
+
+                                if (restaurantId != null)
+                                  _buildRestaurantSuggestions(
+                                    cartItems,
+                                  ),
+
+                                const SizedBox(
+                                    height: 20),
+
+                                const Divider(),
+
+                                if (bill != null) ...[
+                                  BillRow(
+                                    title:
+                                        "Items Total",
+                                    value:
+                                        "₹${bill.itemsTotal.toStringAsFixed(0)}",
+                                  ),
+
+                                  if (effectiveCouponApplied)
+                                    BillRow(
+                                      title:
+                                          "Coupon Discount",
+                                      value:
+                                          "-₹${bill.couponDiscount.toStringAsFixed(0)}",
+                                    ),
+
+                                  BillRow(
+                                    title:
+                                        "Delivery Fee",
+                                    value:
+                                        "₹${bill.deliveryFee.toStringAsFixed(0)}",
+                                  ),
+
+                                  if (bill.longDistanceCharge >
+                                      0)
+                                    BillRow(
+                                      title:
+                                          "Long Distance Charge",
+                                      value:
+                                          "₹${bill.longDistanceCharge.toStringAsFixed(0)}",
+                                    ),
+
+                                  BillRow(
+                                    title:
+                                        "Platform Fee",
+                                    value:
+                                        "₹${bill.platformFee.toStringAsFixed(0)}",
+                                  ),
+
+                                  const Divider(),
+
+                                  BillRow(
+                                    title:
+                                        "Grand Total",
+                                    value:
+                                        "₹${bill.grandTotal.toStringAsFixed(0)}",
+                                    bold: true,
+                                  ),
+                                ] else
+                                  const Padding(
+                                    padding:
+                                        EdgeInsets.all(
+                                      12,
+                                    ),
+                                    child: Text(
+                                      "Add a valid delivery address to calculate your bill.",
                                       style:
-                                          const TextStyle(
+                                          TextStyle(
                                         color:
                                             Colors.grey,
                                       ),
                                     ),
-                                  ],
+                                  ),
+
+                                const SizedBox(
+                                    height: 20),
+
+                                SizedBox(
+                                  width:
+                                      double.infinity,
+                                  height: 55,
+                                  child:
+                                      ElevatedButton(
+                                    onPressed:
+                                        restaurantId ==
+                                                    null ||
+                                                bill ==
+                                                    null ||
+                                                !hasDistance ||
+                                                !isServiceable ||
+                                                distanceLoading
+                                            ? null
+                                            : () {
+                                                _proceedToCheckout(
+                                                  context:
+                                                      context,
+                                                  couponApplied:
+                                                      effectiveCouponApplied,
+                                                  couponCode:
+                                                      effectiveCouponApplied
+                                                          ? appliedCoupon
+                                                          : null,
+                                                  couponDiscount:
+                                                      effectiveCouponDiscount,
+                                                  restaurantId:
+                                                      restaurantId,
+                                                  distanceKm:
+                                                      distanceKm,
+                                                );
+                                              },
+                                    style:
+                                        ElevatedButton
+                                            .styleFrom(
+                                      backgroundColor:
+                                          Colors
+                                              .deepPurple,
+                                      foregroundColor:
+                                          Colors.white,
+                                      disabledBackgroundColor:
+                                          Colors.grey
+                                              .shade400,
+                                    ),
+                                    child:
+                                        const Text(
+                                      "Proceed to Checkout",
+                                      style:
+                                          TextStyle(
+                                        fontSize: 16,
+                                        fontWeight:
+                                            FontWeight
+                                                .bold,
+                                      ),
+                                    ),
+                                  ),
                                 ),
-                              ),
-                              TextButton(
-                                onPressed:
-                                    restaurantId == null
-                                        ? null
-                                        : () async {
-                                            if (effectiveCouponApplied) {
-                                              _removeCoupon();
-                                              return;
-                                            }
-
-                                            await _selectCoupon(
-                                              context:
-                                                  context,
-                                              restaurantId:
-                                                  restaurantId,
-                                              itemsTotal:
-                                                  itemsTotal,
-                                            );
-                                          },
-                                child: Text(
-                                  effectiveCouponApplied
-                                      ? "Remove"
-                                      : "View",
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-
-                        const SizedBox(height: 18),
-
-                        if (restaurantId != null)
-                          _buildRestaurantSuggestions(
-                            cartItems,
-                          ),
-
-                        const SizedBox(height: 20),
-
-                        const Divider(),
-
-                        BillRow(
-                          title: "Items Total",
-                          value:
-                              "₹${bill.itemsTotal.toStringAsFixed(0)}",
-                        ),
-
-                        if (effectiveCouponApplied)
-                          BillRow(
-                            title:
-                                "Coupon Discount",
-                            value:
-                                "-₹${bill.couponDiscount.toStringAsFixed(0)}",
-                          ),
-
-                        BillRow(
-                          title: "Delivery Fee",
-                          value:
-                              "₹${bill.deliveryFee.toStringAsFixed(0)}",
-                        ),
-
-                        BillRow(
-                          title: "Platform Fee",
-                          value:
-                              "₹${bill.platformFee.toStringAsFixed(0)}",
-                        ),
-
-                        const Divider(),
-
-                        BillRow(
-                          title: "Grand Total",
-                          value:
-                              "₹${bill.grandTotal.toStringAsFixed(0)}",
-                          bold: true,
-                        ),
-
-                        const SizedBox(height: 20),
-
-                        SizedBox(
-                          width: double.infinity,
-                          height: 55,
-                          child: ElevatedButton(
-                            onPressed: restaurantId == null
-                                ? null
-                                : () {
-                                    _proceedToCheckout(
-                                      context: context,
-                                      couponApplied:
-                                          effectiveCouponApplied,
-                                      couponCode:
-                                          effectiveCouponApplied
-                                              ? appliedCoupon
-                                              : null,
-                                      couponDiscount:
-                                          effectiveCouponDiscount,
-                                    );
-                                  },
-                            style:
-                                ElevatedButton.styleFrom(
-                              backgroundColor:
-                                  Colors.deepPurple,
-                              foregroundColor:
-                                  Colors.white,
-                            ),
-                            child: const Text(
-                              "Proceed to Checkout",
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight:
-                                    FontWeight.bold,
-                              ),
+                              ],
                             ),
                           ),
-                        ),
-                      ],
-                    ),
-                  ),
+                        );
+                      },
+                    );
+                  },
                 ),
         );
       },
@@ -1112,12 +1519,17 @@ class _CartScreenState extends State<CartScreen> {
             SizedBox(
               height: 235,
               child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: suggestions.length,
+                scrollDirection:
+                    Axis.horizontal,
+                itemCount:
+                    suggestions.length,
                 separatorBuilder:
                     (_, __) =>
-                        const SizedBox(width: 12),
-                itemBuilder: (context, index) {
+                        const SizedBox(
+                      width: 12,
+                    ),
+                itemBuilder:
+                    (context, index) {
                   final item =
                       suggestions[index];
 
@@ -1137,7 +1549,8 @@ class _CartScreenState extends State<CartScreen> {
   }
 }
 
-class _SuggestionCard extends StatelessWidget {
+class _SuggestionCard
+    extends StatelessWidget {
   final CartItemModel item;
   final VoidCallback onAdd;
 
@@ -1152,7 +1565,8 @@ class _SuggestionCard extends StatelessWidget {
       width: 175,
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius:
+            BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(
@@ -1163,7 +1577,8 @@ class _SuggestionCard extends StatelessWidget {
           ),
         ],
       ),
-      clipBehavior: Clip.antiAlias,
+      clipBehavior:
+          Clip.antiAlias,
       child: Column(
         crossAxisAlignment:
             CrossAxisAlignment.start,
@@ -1171,12 +1586,18 @@ class _SuggestionCard extends StatelessWidget {
           SizedBox(
             height: 112,
             width: double.infinity,
-            child: item.imageUrl.trim().isNotEmpty
+            child: item.imageUrl
+                    .trim()
+                    .isNotEmpty
                 ? Image.network(
                     item.imageUrl,
                     fit: BoxFit.cover,
                     errorBuilder:
-                        (context, error, stackTrace) {
+                        (
+                      context,
+                      error,
+                      stackTrace,
+                    ) {
                       return _imageFallback();
                     },
                   )
@@ -1201,10 +1622,13 @@ class _SuggestionCard extends StatelessWidget {
                     maxLines: 2,
                     overflow:
                         TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style:
+                        const TextStyle(
                       fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
+                      fontWeight:
+                          FontWeight.bold,
+                      color:
+                          Colors.black87,
                     ),
                   ),
 
@@ -1212,44 +1636,59 @@ class _SuggestionCard extends StatelessWidget {
 
                   Text(
                     "₹${item.price.toStringAsFixed(0)}",
-                    style: const TextStyle(
+                    style:
+                        const TextStyle(
                       fontSize: 15,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.deepPurple,
+                      fontWeight:
+                          FontWeight.bold,
+                      color:
+                          Colors.deepPurple,
                     ),
                   ),
 
-                  const SizedBox(height: 8),
+                  const SizedBox(
+                      height: 8),
 
                   SizedBox(
-                    width: double.infinity,
+                    width:
+                        double.infinity,
                     height: 34,
-                    child: ElevatedButton(
-                      onPressed: onAdd,
+                    child:
+                        ElevatedButton(
+                      onPressed:
+                          onAdd,
                       style:
-                          ElevatedButton.styleFrom(
+                          ElevatedButton
+                              .styleFrom(
                         backgroundColor:
-                            Colors.deepPurple,
+                            Colors
+                                .deepPurple,
                         foregroundColor:
                             Colors.white,
                         elevation: 0,
                         padding:
-                            const EdgeInsets.symmetric(
+                            const EdgeInsets
+                                .symmetric(
                           horizontal: 8,
                         ),
                         shape:
                             RoundedRectangleBorder(
                           borderRadius:
-                              BorderRadius.circular(
+                              BorderRadius
+                                  .circular(
                             10,
                           ),
                         ),
                       ),
-                      child: const Text(
+                      child:
+                          const Text(
                         "Add to Cart",
-                        style: TextStyle(
+                        style:
+                            TextStyle(
                           fontSize: 12,
-                          fontWeight: FontWeight.bold,
+                          fontWeight:
+                              FontWeight
+                                  .bold,
                         ),
                       ),
                     ),
@@ -1265,11 +1704,14 @@ class _SuggestionCard extends StatelessWidget {
 
   Widget _imageFallback() {
     return Container(
-      color: const Color(0xFFF3EEFF),
-      alignment: Alignment.center,
+      color:
+          const Color(0xFFF3EEFF),
+      alignment:
+          Alignment.center,
       child: Text(
         item.emoji,
-        style: const TextStyle(
+        style:
+            const TextStyle(
           fontSize: 42,
         ),
       ),

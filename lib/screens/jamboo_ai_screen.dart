@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 import '../models/cart_item_model.dart';
 import '../services/cart_service.dart';
@@ -14,6 +15,9 @@ class JambooAIScreen extends StatefulWidget {
 class _JambooAIScreenState extends State<JambooAIScreen> {
   final TextEditingController _controller =
       TextEditingController();
+
+  final ScrollController _scrollController =
+      ScrollController();
 
   final FirebaseFunctions _functions =
       FirebaseFunctions.instanceFor(
@@ -43,6 +47,46 @@ class _JambooAIScreenState extends State<JambooAIScreen> {
     },
   ];
 
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_scrollController.hasClients) {
+        return;
+      }
+
+      _scrollController.animateTo(
+        _scrollController.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
+    });
+  }
+
+  Future<void> _preloadRecommendationImages(
+    List<Map<String, dynamic>> recommendations,
+  ) async {
+    if (!mounted) {
+      return;
+    }
+
+    for (final item in recommendations) {
+      final imageUrl =
+          (item["imageUrl"] ?? "").toString().trim();
+
+      if (imageUrl.isEmpty) {
+        continue;
+      }
+
+      try {
+        await precacheImage(
+          CachedNetworkImageProvider(imageUrl),
+          context,
+        );
+      } catch (_) {
+        // Image loading failure is handled by the card itself.
+      }
+    }
+  }
+
   Future<void> sendMessage() async {
     final message = _controller.text.trim();
 
@@ -61,13 +105,24 @@ class _JambooAIScreenState extends State<JambooAIScreen> {
       _controller.clear();
     });
 
+    _scrollToBottom();
+
     try {
       final callable =
           _functions.httpsCallable("jambooAI");
 
+      final stopwatch = Stopwatch()..start();
+
       final result = await callable.call({
         "message": message,
       });
+
+      stopwatch.stop();
+
+      debugPrint(
+        "🤖 Jamboo AI response time: "
+        "${stopwatch.elapsedMilliseconds} ms",
+      );
 
       final data =
           Map<String, dynamic>.from(result.data);
@@ -102,6 +157,13 @@ class _JambooAIScreenState extends State<JambooAIScreen> {
           "recommendations": recommendations,
         });
       });
+
+      _scrollToBottom();
+
+      // Recommendation images ko background me preload karo.
+      _preloadRecommendationImages(
+        recommendations,
+      );
     } on FirebaseFunctionsException catch (error) {
       if (!mounted) {
         return;
@@ -118,6 +180,8 @@ class _JambooAIScreenState extends State<JambooAIScreen> {
           "recommendations": [],
         });
       });
+
+      _scrollToBottom();
     } catch (error) {
       if (!mounted) {
         return;
@@ -133,6 +197,8 @@ class _JambooAIScreenState extends State<JambooAIScreen> {
           "recommendations": [],
         });
       });
+
+      _scrollToBottom();
     }
   }
 
@@ -310,11 +376,22 @@ class _JambooAIScreenState extends State<JambooAIScreen> {
               width: 92,
               height: 92,
               child: imageUrl.isNotEmpty
-                  ? Image.network(
-                      imageUrl,
+                  ? CachedNetworkImage(
+                      imageUrl: imageUrl,
                       fit: BoxFit.cover,
-                      errorBuilder:
-                          (context, error, stack) {
+                      placeholder:
+                          (context, url) {
+                        return Center(
+                          child:
+                              CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color:
+                                Colors.deepPurple,
+                          ),
+                        );
+                      },
+                      errorWidget:
+                          (context, url, error) {
                         return Center(
                           child: Text(
                             emoji,
@@ -463,6 +540,7 @@ class _JambooAIScreenState extends State<JambooAIScreen> {
   @override
   void dispose() {
     _controller.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -501,6 +579,7 @@ class _JambooAIScreenState extends State<JambooAIScreen> {
         children: [
           Expanded(
             child: ListView.builder(
+              controller: _scrollController,
               padding:
                   const EdgeInsets.all(16),
               itemCount: messages.length,
