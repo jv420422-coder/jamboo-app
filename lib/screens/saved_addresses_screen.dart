@@ -100,37 +100,83 @@ class _SavedAddressesScreenState
                               as Map<String, dynamic>;
 return GestureDetector(
                         onTap: () async {
-
   setState(() {
     selectedAddressId = docs[index].id;
   });
 
+  // Checkout mode: existing workflow preserve karo.
   if (widget.isCheckoutMode) {
+    try {
+      final batch = FirebaseFirestore.instance.batch();
 
-    final batch = FirebaseFirestore.instance.batch();
+      for (final doc in docs) {
+        batch.update(
+          doc.reference,
+          {
+            "selectedForCheckout": false,
+          },
+        );
+      }
 
-    for (final doc in docs) {
       batch.update(
-        doc.reference,
+        docs[index].reference,
         {
-          "selectedForCheckout": false,
+          "selectedForCheckout": true,
         },
+      );
+
+      await batch.commit();
+
+      if (!context.mounted) return;
+
+      Navigator.pop(context);
+    } catch (e) {
+      if (!context.mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            "Unable to select address. Please try again.",
+          ),
+        ),
       );
     }
 
-    batch.update(
-      docs[index].reference,
-      {
-        "selectedForCheckout": true,
-      },
+    return;
+  }
+
+  // Normal mode: address aur coordinates return karo.
+  final latitude = data["latitude"];
+  final longitude = data["longitude"];
+
+  if (latitude is! num || longitude is! num) {
+    if (!context.mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          "This address has no location coordinates. Please edit the address or use Current Location.",
+        ),
+      ),
     );
 
-    await batch.commit();
-
-    if (context.mounted) {
-      Navigator.pop(context);
-    }
+    return;
   }
+
+  Navigator.pop(
+    context,
+    <String, dynamic>{
+      "addressId": docs[index].id,
+      "fullName": data["fullName"] ?? "",
+      "address": data["address"] ?? "",
+      "landmark": data["landmark"] ?? "",
+      "city": data["city"] ?? "",
+      "state": data["state"] ?? "",
+      "pincode": data["pincode"] ?? "",
+      "latitude": latitude.toDouble(),
+      "longitude": longitude.toDouble(),
+    },
+  );
 },
 
                         child: Container(

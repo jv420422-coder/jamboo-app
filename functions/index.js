@@ -3,6 +3,8 @@ const {onCall, HttpsError} =
     require("firebase-functions/v2/https");
 const {defineSecret} =
     require("firebase-functions/params");
+const googleMapsApiKey =
+    defineSecret("GOOGLE_MAPS_API_KEY");
 const admin = require("firebase-admin");
 const OpenAI = require("openai");
 
@@ -30,6 +32,10 @@ const soldQuantity =
 
 exports.updateSoldQuantity =
     soldQuantity.updateSoldQuantity;
+
+// ============================================================
+// JAMBOO AI
+// ============================================================
 
 exports.jambooAI = onCall(
     {
@@ -82,7 +88,10 @@ exports.jambooAI = onCall(
           const data = doc.data();
 
           const restaurantId =
-              data.restaurantId || doc.id;
+              (
+                data.restaurantId ||
+                doc.id
+              ).toString();
 
           restaurants[restaurantId] = {
             id: restaurantId,
@@ -375,10 +384,10 @@ exports.jambooAI = onCall(
         return {
           success: true,
           reply:
-    (response.output_text ||
-      "Sorry, mujhe abhi recommendation " +
-      "nahi mil paayi.")
-        .replace(/\*\*/g, ""),
+              (response.output_text ||
+                "Sorry, mujhe abhi recommendation " +
+                "nahi mil paayi.")
+                  .replace(/\*\*/g, ""),
           recommendations:
               recommendations.map((item) => ({
                 id: item.id,
@@ -438,7 +447,6 @@ exports.deleteCustomerAccount = onCall(
       try {
         // --------------------------------------------------------
         // 1. Get customer ratings before deleting them
-        //    so restaurant averages can be recalculated.
         // --------------------------------------------------------
 
         const ratingsSnapshot = await db
@@ -473,7 +481,7 @@ exports.deleteCustomerAccount = onCall(
         }
 
         // --------------------------------------------------------
-        // 3. Delete delivery partner ratings by this customer
+        // 3. Delete delivery partner ratings
         // --------------------------------------------------------
 
         const deliveryRatingsSnapshot = await db
@@ -573,9 +581,9 @@ exports.deleteCustomerAccount = onCall(
           }
 
           const average =
-          validRatings === 0 ?
-            0 :
-            total / validRatings;
+              validRatings === 0 ?
+                  0 :
+                  total / validRatings;
 
           await db
               .collection("restaurant_registrations")
@@ -610,6 +618,296 @@ exports.deleteCustomerAccount = onCall(
         throw new HttpsError(
             "internal",
             "Unable to delete your account. Please try again.",
+        );
+      }
+    },
+);
+// ============================================================
+// GET ADDRESS FROM CURRENT LOCATION
+// ============================================================
+
+exports.getAddressFromCoordinates = onCall(
+    {
+      secrets: [googleMapsApiKey],
+      region: "asia-south1",
+    },
+    async (request) => {
+      if (!request.auth) {
+        throw new HttpsError(
+            "unauthenticated",
+            "Please login to get your address.",
+        );
+      }
+
+      const latitude = Number(request.data?.latitude);
+      const longitude = Number(request.data?.longitude);
+
+      if (
+        !Number.isFinite(latitude) ||
+        !Number.isFinite(longitude) ||
+        latitude < -90 ||
+        latitude > 90 ||
+        longitude < -180 ||
+        longitude > 180
+      ) {
+        throw new HttpsError(
+            "invalid-argument",
+            "Valid latitude and longitude are required.",
+        );
+      }
+
+      try {
+        const apiKey = googleMapsApiKey.value();
+
+        const url = new URL(
+            "https://maps.googleapis.com/maps/api/geocode/json",
+        );
+
+        url.searchParams.set(
+            "latlng",
+            `${latitude},${longitude}`,
+        );
+        url.searchParams.set("key", apiKey);
+
+        const response = await fetch(url);
+
+        if (!response.ok) {
+          throw new Error(
+              `Geocoding HTTP error: ${response.status}`,
+          );
+        }
+
+        const data = await response.json();
+
+        if (data.status !== "OK") {
+          console.error(
+              "Geocoding API error:",
+              data.status,
+              data.error_message || "",
+          );
+
+          if (data.status === "ZERO_RESULTS") {
+            throw new HttpsError(
+                "not-found",
+                "Address details could not be found.",
+            );
+          }
+
+          throw new HttpsError(
+              "internal",
+              "Unable to find your address right now.",
+          );
+        }
+
+        const result = data.results?.[0];
+
+        if (!result) {
+          throw new HttpsError(
+              "not-found",
+              "Address details could not be found.",
+          );
+        }
+
+        const components =
+            result.address_components || [];
+
+        let streetNumber = "";
+        let route = "";
+        let subLocality = "";
+        let neighborhood = "";
+        let locality = "";
+        let administrativeArea = "";
+        let postalCode = "";
+
+        for (const component of components) {
+          const types = component.types || [];
+          const longName = component.long_name || "";
+
+          if (types.includes("street_number")) {
+            streetNumber = longName;
+          } else if (types.includes("route")) {
+            route = longName;
+          } else if (
+            types.includes("sublocality_level_1") ||
+            types.includes("sublocality")
+          ) {
+            subLocality = longName;
+          } else if (types.includes("neighborhood")) {
+            neighborhood = longName;
+          } else if (types.includes("locality")) {
+            locality = longName;
+          } else if (
+            types.includes("administrative_area_level_1")
+          ) {
+            administrativeArea = longName;
+          } else if (types.includes("postal_code")) {
+            postalCode = longName;
+          }
+        }
+
+        const addressParts = [
+          streetNumber,
+          route,
+          subLocality,
+        ].filter((part) => part.trim().length > 0);
+
+        return {
+          success: true,
+          address: addressParts.length > 0 ?
+              addressParts.join(", ") :
+              (result.formatted_address || ""),
+          city: locality,
+          state: administrativeArea,
+          pincode: postalCode,
+          landmark: subLocality || neighborhood,
+        };
+      } catch (error) {
+        if (error instanceof HttpsError) {
+          throw error;
+        }
+
+        console.error(
+            "GET ADDRESS FROM LOCATION ERROR:",
+            error,
+        );
+
+        throw new HttpsError(
+            "internal",
+            "Unable to get address. Please try again.",
+        );
+      }
+    },
+);
+// ============================================================
+// GET COORDINATES FROM MANUALLY ENTERED ADDRESS
+// ============================================================
+
+exports.getCoordinatesFromAddress = onCall(
+    {
+      secrets: [googleMapsApiKey],
+      region: "asia-south1",
+    },
+    async (request) => {
+      if (!request.auth) {
+        throw new HttpsError(
+            "unauthenticated",
+            "Please login to find your address coordinates.",
+        );
+      }
+
+      const address =
+          typeof request.data?.address === "string" ?
+              request.data.address.trim() :
+              "";
+
+      const city =
+          typeof request.data?.city === "string" ?
+              request.data.city.trim() :
+              "";
+
+      const state =
+          typeof request.data?.state === "string" ?
+              request.data.state.trim() :
+              "";
+
+      const pincode =
+          typeof request.data?.pincode === "string" ?
+              request.data.pincode.trim() :
+              "";
+
+      if (!address || !city || !state) {
+        throw new HttpsError(
+            "invalid-argument",
+            "Address, city and state are required.",
+        );
+      }
+
+      try {
+        const apiKey = googleMapsApiKey.value();
+
+        const fullAddress = [
+          address,
+          city,
+          state,
+          pincode,
+          "India",
+        ].filter((part) => part.length > 0).join(", ");
+
+        const url = new URL(
+            "https://maps.googleapis.com/maps/api/geocode/json",
+        );
+
+        url.searchParams.set("address", fullAddress);
+        url.searchParams.set("key", apiKey);
+        url.searchParams.set("region", "in");
+
+        const response = await fetch(url);
+
+        if (!response.ok) {
+          throw new Error(
+              `Geocoding HTTP error: ${response.status}`,
+          );
+        }
+
+        const data = await response.json();
+
+        if (data.status !== "OK" || !data.results?.length) {
+          console.error(
+              "ADDRESS GEOCODING ERROR:",
+              data.status,
+              data.error_message || "",
+          );
+
+          if (data.status === "ZERO_RESULTS") {
+            throw new HttpsError(
+                "not-found",
+                "Could not find coordinates for this address. " +
+                "Please check the address details.",
+            );
+          }
+
+          throw new HttpsError(
+              "internal",
+              "Unable to find address coordinates right now.",
+          );
+        }
+
+        const result = data.results[0];
+        const location = result.geometry?.location;
+
+        if (
+          !location ||
+          !Number.isFinite(location.lat) ||
+          !Number.isFinite(location.lng)
+        ) {
+          throw new HttpsError(
+              "not-found",
+              "Valid coordinates could not be found.",
+          );
+        }
+
+        return {
+          success: true,
+          latitude: location.lat,
+          longitude: location.lng,
+          formattedAddress:
+              result.formatted_address || fullAddress,
+          locationType:
+              result.geometry?.location_type || "UNKNOWN",
+        };
+      } catch (error) {
+        if (error instanceof HttpsError) {
+          throw error;
+        }
+
+        console.error(
+            "GET COORDINATES FROM ADDRESS ERROR:",
+            error,
+        );
+
+        throw new HttpsError(
+            "internal",
+            "Unable to find coordinates. Please try again.",
         );
       }
     },

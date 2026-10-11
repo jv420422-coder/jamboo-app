@@ -2,11 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
+import 'package:cloud_functions/cloud_functions.dart';
 
 class AddNewAddressScreen extends StatefulWidget {
-
   final String? documentId;
   final Map<String, dynamic>? addressData;
 
@@ -21,10 +19,8 @@ class AddNewAddressScreen extends StatefulWidget {
       _AddNewAddressScreenState();
 }
 
-
 class _AddNewAddressScreenState
     extends State<AddNewAddressScreen> {
-
   final nameController = TextEditingController();
   final phoneController = TextEditingController();
   final addressController = TextEditingController();
@@ -32,202 +28,142 @@ class _AddNewAddressScreenState
   final stateController = TextEditingController();
   final pincodeController = TextEditingController();
   final landmarkController = TextEditingController();
+
   double? _latitude;
-double? _longitude;
+  double? _longitude;
 
   bool isLoading = true;
   bool isSaving = false;
+  bool isGettingLocation = false;
 
   String selectedType = "Home";
+
+  // Original address values are used to determine
+  // whether a saved address has actually changed.
+  String _originalAddress = "";
+  String _originalCity = "";
+  String _originalState = "";
+  String _originalPincode = "";
+
+  // ============================================================
+  // GET CURRENT LOCATION
+  // ============================================================
+
   Future<void> getCurrentLocation() async {
-  bool serviceEnabled =
-      await Geolocator.isLocationServiceEnabled();
+    if (isGettingLocation || isSaving) return;
 
-  if (!serviceEnabled) {
-    if (!mounted) return;
+    setState(() {
+      isGettingLocation = true;
+    });
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text("Please enable Location"),
-      ),
-    );
-    return;
-  }
+    try {
+      final serviceEnabled =
+          await Geolocator.isLocationServiceEnabled();
 
-  LocationPermission permission =
-      await Geolocator.checkPermission();
+      if (!serviceEnabled) {
+        throw Exception("Please enable Location.");
+      }
 
-  if (permission == LocationPermission.denied) {
-    permission =
-        await Geolocator.requestPermission();
-  }
+      LocationPermission permission =
+          await Geolocator.checkPermission();
 
-  if (permission == LocationPermission.denied ||
-      permission == LocationPermission.deniedForever) {
-    if (!mounted) return;
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text("Location Permission Denied"),
-      ),
-    );
-    return;
-  }
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        throw Exception("Location permission denied.");
+      }
 
-  try {
-    final position =
-        await Geolocator.getCurrentPosition(
-      locationSettings: const LocationSettings(
-        accuracy: LocationAccuracy.high,
-      ),
-    );
+      // Get device's current GPS coordinates.
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+        ),
+      );
 
-    _latitude = position.latitude;
-    _longitude = position.longitude;
+      if (!mounted) return;
 
-    const apiKey =
-        "AIzaSyATVKIrhaNIbGulsfeLEnP5Tzukqnc3m_s";
+      // Preserve actual GPS coordinates.
+      _latitude = position.latitude;
+      _longitude = position.longitude;
 
-    final url =
-        "https://maps.googleapis.com/maps/api/geocode/json"
-        "?latlng=${position.latitude},${position.longitude}"
-        "&key=$apiKey";
+      // Reverse geocode through Firebase Cloud Function.
+      final callable = FirebaseFunctions.instanceFor(
+        region: 'asia-south1',
+      ).httpsCallable('getAddressFromCoordinates');
 
-    final response =
-        await http.get(Uri.parse(url));
+      final response = await callable.call({
+        'latitude': position.latitude,
+        'longitude': position.longitude,
+      });
 
-    final data = jsonDecode(response.body);
+      final data = Map<String, dynamic>.from(
+        response.data as Map,
+      );
 
-    if (data["status"] != "OK") {
+      if (!mounted) return;
+
+      // Fill the existing address fields.
+      addressController.text =
+          (data['address'] ?? '').toString();
+
+      cityController.text =
+          (data['city'] ?? '').toString();
+
+      stateController.text =
+          (data['state'] ?? '').toString();
+
+      pincodeController.text =
+          (data['pincode'] ?? '').toString();
+
+      landmarkController.text =
+          (data['landmark'] ?? '').toString();
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            "Current location added successfully ✅",
+          ),
+        ),
+      );
+    } on FirebaseFunctionsException catch (e) {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            "${data["status"]}\n"
-            "${data["error_message"] ?? ""}",
+            e.message ??
+                "Unable to get address. Please try again.",
           ),
         ),
       );
 
-      return;
-    }
-
-    final results = data["results"];
-
-    if (results == null ||
-        results is! List ||
-        results.isEmpty) {
+      debugPrint(
+        "CURRENT LOCATION FUNCTION ERROR: "
+        "${e.code} - ${e.message}",
+      );
+    } catch (e) {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Text(
-            "Address details could not be found.",
+            e.toString().replaceFirst('Exception: ', ''),
           ),
         ),
       );
 
-      return;
-    }
-
-    final result = results[0];
-
-    final components =
-        result["address_components"] as List<dynamic>? ??
-            [];
-
-    String? streetNumber;
-    String? route;
-    String? subLocality;
-    String? neighborhood;
-    String? locality;
-    String? administrativeArea;
-    String? postalCode;
-
-    for (final component in components) {
-      final types =
-          (component["types"] as List<dynamic>? ?? [])
-              .map((type) => type.toString())
-              .toList();
-
-      final longName =
-          (component["long_name"] ?? "").toString().trim();
-
-      if (types.contains("street_number")) {
-        streetNumber = longName;
-      } else if (types.contains("route")) {
-        route = longName;
-      } else if (types.contains("sublocality_level_1") ||
-          types.contains("sublocality")) {
-        subLocality = longName;
-      } else if (types.contains("neighborhood")) {
-        neighborhood = longName;
-      } else if (types.contains("locality")) {
-        locality = longName;
-      } else if (types.contains(
-        "administrative_area_level_1",
-      )) {
-        administrativeArea = longName;
-      } else if (types.contains("postal_code")) {
-        postalCode = longName;
+      debugPrint("GET CURRENT LOCATION ERROR: $e");
+    } finally {
+      if (mounted) {
+        setState(() {
+          isGettingLocation = false;
+        });
       }
     }
-
-    final addressParts = <String>[
-      if (streetNumber != null &&
-          streetNumber.isNotEmpty)
-        streetNumber,
-      if (route != null && route.isNotEmpty)
-        route,
-      if (subLocality != null &&
-          subLocality.isNotEmpty)
-        subLocality,
-    ];
-
-    final addressText = addressParts.join(", ");
-
-    addressController.text =
-        addressText.isNotEmpty
-            ? addressText
-            : (result["formatted_address"] ?? "")
-                .toString();
-
-    cityController.text =
-        locality ?? "";
-
-    stateController.text =
-        administrativeArea ?? "";
-
-    pincodeController.text =
-        postalCode ?? "";
-
-    landmarkController.text =
-        subLocality ??
-        neighborhood ??
-        "";
-
-    if (!mounted) return;
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          "Current location added successfully ✅",
-        ),
-      ),
-    );
-  } catch (e) {
-    if (!mounted) return;
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          "Unable to get address: $e",
-        ),
-      ),
-    );
   }
-}
 
   @override
   void initState() {
@@ -235,46 +171,260 @@ double? _longitude;
     loadUser();
   }
 
+  // ============================================================
+  // LOAD USER AND EXISTING ADDRESS
+  // ============================================================
+
   Future<void> loadUser() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
 
-    final uid = FirebaseAuth.instance.currentUser!.uid;
+      if (user == null) {
+        throw Exception("Please login again.");
+      }
 
-    final doc = await FirebaseFirestore.instance
-        .collection("users")
-        .doc(uid)
-        .get();
+      final doc = await FirebaseFirestore.instance
+          .collection("users")
+          .doc(user.uid)
+          .get();
 
-    if (doc.exists) {
+      if (doc.exists) {
+        final data = doc.data()!;
 
-      final data = doc.data()!;
+        nameController.text = data["name"] ?? "";
+        phoneController.text = data["phone"] ?? "";
+      }
 
-      nameController.text = data["name"] ?? "";
-      phoneController.text = data["phone"] ?? "";
+      if (widget.addressData != null) {
+        final address = widget.addressData!;
+
+        nameController.text = address["fullName"] ?? "";
+        phoneController.text = address["phone"] ?? "";
+
+        addressController.text = address["address"] ?? "";
+        landmarkController.text = address["landmark"] ?? "";
+        cityController.text = address["city"] ?? "";
+        stateController.text = address["state"] ?? "";
+        pincodeController.text = address["pincode"] ?? "";
+
+        _latitude =
+            (address["latitude"] as num?)?.toDouble();
+
+        _longitude =
+            (address["longitude"] as num?)?.toDouble();
+
+        selectedType = address["type"] ?? "Home";
+
+        // Remember the original address and coordinates.
+        _originalAddress = addressController.text.trim();
+        _originalCity = cityController.text.trim();
+        _originalState = stateController.text.trim();
+        _originalPincode = pincodeController.text.trim();
+      }
+    } catch (e) {
+      debugPrint("LOAD USER ERROR: $e");
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Unable to load address details."),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+      }
     }
-    if (widget.addressData != null) {
+  }
 
-  final address = widget.addressData!;
+  // ============================================================
+  // GET COORDINATES FROM MANUALLY ENTERED ADDRESS
+  // ============================================================
 
-  nameController.text = address["fullName"] ?? "";
-  phoneController.text = address["phone"] ?? "";
+  Future<Map<String, dynamic>> getCoordinatesFromAddress({
+    required String address,
+    required String city,
+    required String state,
+    required String pincode,
+  }) async {
+    final callable = FirebaseFunctions.instanceFor(
+      region: 'asia-south1',
+    ).httpsCallable('getCoordinatesFromAddress');
 
-  addressController.text = address["address"] ?? "";
-  landmarkController.text = address["landmark"] ?? "";
-  cityController.text = address["city"] ?? "";
-  stateController.text = address["state"] ?? "";
-  pincodeController.text = address["pincode"] ?? "";
+    final response = await callable.call({
+      'address': address,
+      'city': city,
+      'state': state,
+      'pincode': pincode,
+    });
 
-  selectedType = address["type"] ?? "Home";
-}
+    final data = Map<String, dynamic>.from(
+      response.data as Map,
+    );
+
+    final latitude = data['latitude'];
+    final longitude = data['longitude'];
+
+    if (data['success'] != true ||
+        latitude is! num ||
+        longitude is! num) {
+      throw Exception(
+        "Coordinates could not be found. "
+        "Please check your address.",
+      );
+    }
+
+    return {
+      'latitude': latitude.toDouble(),
+      'longitude': longitude.toDouble(),
+    };
+  }
+
+  // ============================================================
+  // SAVE ADDRESS
+  // ============================================================
+
+  Future<void> saveAddress() async {
+    if (isSaving || isGettingLocation) return;
+
+    if (nameController.text.trim().isEmpty ||
+        phoneController.text.trim().isEmpty ||
+        addressController.text.trim().isEmpty ||
+        cityController.text.trim().isEmpty ||
+        stateController.text.trim().isEmpty ||
+        pincodeController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Please fill all required fields"),
+        ),
+      );
+      return;
+    }
 
     setState(() {
-      isLoading = false;
+      isSaving = true;
     });
+
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+
+      if (user == null) {
+        throw Exception("Please login again.");
+      }
+
+      final address = addressController.text.trim();
+      final city = cityController.text.trim();
+      final state = stateController.text.trim();
+      final pincode = pincodeController.text.trim();
+
+      final addressUnchanged =
+          widget.documentId != null &&
+          address == _originalAddress &&
+          city == _originalCity &&
+          state == _originalState &&
+          pincode == _originalPincode;
+
+      // If the address was not changed, retain its existing
+      // coordinates. Otherwise, geocode the new address.
+      if (!addressUnchanged) {
+        final coordinates = await getCoordinatesFromAddress(
+          address: address,
+          city: city,
+          state: state,
+          pincode: pincode,
+        );
+
+        _latitude = coordinates['latitude'] as double;
+        _longitude = coordinates['longitude'] as double;
+      }
+
+      // Do not save an address without valid coordinates.
+      if (_latitude == null || _longitude == null) {
+        throw Exception(
+          "Location coordinates are missing. "
+          "Please use Current Location or check your address.",
+        );
+      }
+
+      final addressData = <String, dynamic>{
+        "fullName": nameController.text.trim(),
+        "phone": phoneController.text.trim(),
+        "address": address,
+        "landmark": landmarkController.text.trim(),
+        "city": city,
+        "state": state,
+        "pincode": pincode,
+        "type": selectedType,
+        "latitude": _latitude,
+        "longitude": _longitude,
+
+        if (widget.documentId == null)
+          "createdAt": FieldValue.serverTimestamp(),
+      };
+
+      final addressesRef = FirebaseFirestore.instance
+          .collection("users")
+          .doc(user.uid)
+          .collection("addresses");
+
+      if (widget.documentId == null) {
+        await addressesRef.add(addressData);
+      } else {
+        await addressesRef
+            .doc(widget.documentId)
+            .update(addressData);
+      }
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Address Saved Successfully ✅"),
+        ),
+      );
+
+      Navigator.pop(context);
+    } on FirebaseFunctionsException catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            e.message ??
+                "Unable to find location. Please check your address.",
+          ),
+        ),
+      );
+
+      debugPrint(
+        "ADDRESS COORDINATES ERROR: ${e.code} - ${e.message}",
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            e.toString().replaceFirst('Exception: ', ''),
+          ),
+        ),
+      );
+
+      debugPrint("SAVE ADDRESS ERROR: $e");
+    } finally {
+      if (mounted) {
+        setState(() {
+          isSaving = false;
+        });
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-
     if (isLoading) {
       return const Scaffold(
         body: Center(
@@ -284,7 +434,6 @@ double? _longitude;
     }
 
     return Scaffold(
-
       backgroundColor: const Color(0xFFF5F0FF),
 
       appBar: AppBar(
@@ -300,44 +449,54 @@ double? _longitude;
       ),
 
       body: SingleChildScrollView(
-
         padding: const EdgeInsets.all(20),
 
         child: Column(
-
-          crossAxisAlignment:
-              CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.start,
 
           children: [
-
             InkWell(
-  onTap: () async {
-    await getCurrentLocation();
-  },
+              onTap: (isGettingLocation || isSaving)
+                  ? null
+                  : getCurrentLocation,
+
               child: Container(
                 width: double.infinity,
-                padding:
-                    const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(16),
+
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius:
-                      BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(16),
                 ),
-                child: const Row(
+
+                child: Row(
                   children: [
+                    if (isGettingLocation)
+                      const SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.5,
+                          color: Colors.deepPurple,
+                        ),
+                      )
+                    else
+                      const Icon(
+                        Icons.my_location,
+                        color: Colors.deepPurple,
+                      ),
 
-                    Icon(
-                      Icons.my_location,
-                      color: Colors.deepPurple,
-                    ),
+                    const SizedBox(width: 10),
 
-                    SizedBox(width: 10),
-
-                    Text(
-                      "Use Current Location",
-                      style: TextStyle(
-                        fontWeight:
-                            FontWeight.bold,
+                    Expanded(
+                      child: Text(
+                        isGettingLocation
+                            ? "Getting your location..."
+                            : "Use Current Location",
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.deepPurple,
+                        ),
                       ),
                     ),
                   ],
@@ -346,7 +505,8 @@ double? _longitude;
             ),
 
             const SizedBox(height: 20),
-const Text(
+
+            const Text(
               "Full Name",
               style: TextStyle(
                 fontWeight: FontWeight.bold,
@@ -357,10 +517,12 @@ const Text(
 
             TextField(
               controller: nameController,
+
               decoration: InputDecoration(
                 hintText: "Enter your name",
                 filled: true,
                 fillColor: Colors.white,
+
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -381,10 +543,12 @@ const Text(
             TextField(
               controller: phoneController,
               keyboardType: TextInputType.phone,
+
               decoration: InputDecoration(
                 hintText: "Enter mobile number",
                 filled: true,
                 fillColor: Colors.white,
+
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -405,10 +569,12 @@ const Text(
             TextField(
               controller: addressController,
               maxLines: 3,
+
               decoration: InputDecoration(
                 hintText: "House No, Area, Street",
                 filled: true,
                 fillColor: Colors.white,
+
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -419,10 +585,12 @@ const Text(
 
             TextField(
               controller: landmarkController,
+
               decoration: InputDecoration(
                 labelText: "Landmark",
                 filled: true,
                 fillColor: Colors.white,
+
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -433,17 +601,17 @@ const Text(
 
             Row(
               children: [
-
                 Expanded(
                   child: TextField(
                     controller: cityController,
+
                     decoration: InputDecoration(
                       labelText: "City",
                       filled: true,
                       fillColor: Colors.white,
+
                       border: OutlineInputBorder(
-                        borderRadius:
-                            BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(12),
                       ),
                     ),
                   ),
@@ -454,13 +622,14 @@ const Text(
                 Expanded(
                   child: TextField(
                     controller: stateController,
+
                     decoration: InputDecoration(
                       labelText: "State",
                       filled: true,
                       fillColor: Colors.white,
+
                       border: OutlineInputBorder(
-                        borderRadius:
-                            BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(12),
                       ),
                     ),
                   ),
@@ -473,10 +642,12 @@ const Text(
             TextField(
               controller: pincodeController,
               keyboardType: TextInputType.number,
+
               decoration: InputDecoration(
                 labelText: "Pincode",
                 filled: true,
                 fillColor: Colors.white,
+
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -496,6 +667,7 @@ const Text(
 
             Wrap(
               spacing: 10,
+
               children: [
                 choiceChip("Home"),
                 choiceChip("Work"),
@@ -504,121 +676,57 @@ const Text(
             ),
 
             const SizedBox(height: 30),
-SizedBox(
-  width: double.infinity,
-  height: 55,
-  child: ElevatedButton(
-    onPressed: isSaving
-        ? null
-        : () async {
 
-            if (nameController.text.isEmpty ||
-                phoneController.text.isEmpty ||
-                addressController.text.isEmpty ||
-                cityController.text.isEmpty ||
-                stateController.text.isEmpty ||
-                pincodeController.text.isEmpty) {
+            SizedBox(
+              width: double.infinity,
+              height: 55,
 
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text(
-                    "Please fill all required fields",
-                  ),
+              child: ElevatedButton(
+                onPressed: (isSaving || isGettingLocation)
+                    ? null
+                    : saveAddress,
+
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.deepPurple,
+                  foregroundColor: Colors.white,
                 ),
-              );
 
-              return;
-            }
-
-            setState(() {
-              isSaving = true;
-            });
-
-            final uid =
-                FirebaseAuth.instance.currentUser!.uid;
-
-             print("SAVE BUTTON CLICKED");
-            final addressData = {
-  "fullName": nameController.text.trim(),
-  "phone": phoneController.text.trim(),
-  "address": addressController.text.trim(),
-  "landmark": landmarkController.text.trim(),
-  "city": cityController.text.trim(),
-  "state": stateController.text.trim(),
-  "pincode": pincodeController.text.trim(),
-  "type": selectedType,
-  "latitude": _latitude,
-
-"longitude": _longitude,
-
-  if (widget.documentId == null)
-    "createdAt": FieldValue.serverTimestamp(),
-};
-
-if (widget.documentId == null) {
-
-  print("NEW ADDRESS SAVED");
-
-  await FirebaseFirestore.instance
-      .collection("users")
-      .doc(uid)
-      .collection("addresses")
-      .add(addressData);
-
-} else {
-
-  print("ADDRESS UPDATED");
-
-  await FirebaseFirestore.instance
-      .collection("users")
-      .doc(uid)
-      .collection("addresses")
-      .doc(widget.documentId)
-      .update(addressData);
-
-}
-            print("ADDRESS SAVED");
-
-            setState(() {
-              isSaving = false;
-            });
-
-            if (context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text(
-                    "Address Saved Successfully ✅",
-                  ),
-                ),
-              );
-
-              Navigator.pop(context);
-            }
-        },
-    style: ElevatedButton.styleFrom(
-      backgroundColor: Colors.deepPurple,
-      foregroundColor: Colors.white,
-    ),
-    child: isSaving
-        ? const CircularProgressIndicator(
-            color: Colors.white,
-          )
-        : const Text(
-            "Save Address",
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 16,
+                child: isSaving
+                    ? const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2.5,
+                            ),
+                          ),
+                          SizedBox(width: 12),
+                          Text("Finding location & saving..."),
+                        ],
+                      )
+                    : const Text(
+                        "Save Address",
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+              ),
             ),
-          ),
-  ),
-),
 
-const SizedBox(height: 20),
-],
+            const SizedBox(height: 20),
+          ],
         ),
       ),
     );
   }
+
+  // ============================================================
+  // ADDRESS TYPE
+  // ============================================================
 
   Widget choiceChip(String title) {
     final bool isSelected = selectedType == title;
@@ -626,11 +734,13 @@ const SizedBox(height: 20),
     return ChoiceChip(
       label: Text(title),
       selected: isSelected,
+
       onSelected: (_) {
         setState(() {
           selectedType = title;
         });
       },
+
       selectedColor: Colors.deepPurple.shade100,
     );
   }
@@ -644,6 +754,7 @@ const SizedBox(height: 20),
     stateController.dispose();
     pincodeController.dispose();
     landmarkController.dispose();
+
     super.dispose();
   }
 }

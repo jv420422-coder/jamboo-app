@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 import '../../models/cart_item_model.dart';
 import '../../models/coupon_model.dart';
@@ -1584,25 +1585,42 @@ class _SuggestionCard
             CrossAxisAlignment.start,
         children: [
           SizedBox(
-            height: 112,
-            width: double.infinity,
-            child: item.imageUrl
-                    .trim()
-                    .isNotEmpty
-                ? Image.network(
-                    item.imageUrl,
-                    fit: BoxFit.cover,
-                    errorBuilder:
-                        (
-                      context,
-                      error,
-                      stackTrace,
-                    ) {
-                      return _imageFallback();
-                    },
-                  )
-                : _imageFallback(),
+  height: 112,
+  width: double.infinity,
+  child: item.imageUrl.trim().isNotEmpty
+      ? CachedNetworkImage(
+          imageUrl: item.imageUrl,
+          fit: BoxFit.cover,
+
+          // Image load hote waqt lightweight placeholder.
+          placeholder: (context, url) {
+            return Container(
+              color: const Color(0xFFF3EEFF),
+              alignment: Alignment.center,
+              child: Text(
+                item.emoji,
+                style: const TextStyle(
+                  fontSize: 42,
+                ),
+              ),
+            );
+          },
+
+          // Agar image load na ho paye to existing fallback.
+          errorWidget: (context, url, error) {
+            return _imageFallback();
+          },
+
+          // Smooth transition instead of sudden image appearance.
+          fadeInDuration: const Duration(
+            milliseconds: 180,
           ),
+
+          // Cached image ko memory mein rakhne ke liye.
+          memCacheWidth: 400,
+        )
+      : _imageFallback(),
+),
 
           Expanded(
             child: Padding(

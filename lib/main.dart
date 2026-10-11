@@ -4,6 +4,8 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'firebase_options.dart';
 import 'services/fcm_service.dart';
+import 'services/internet_service.dart';
+import 'screens/offline_screen.dart';
 import 'package:flutter/foundation.dart';
 import 'splash/splash_controller.dart';
 
@@ -34,6 +36,9 @@ Future<void> main() async {
   }
 
   runApp(const JambooApp());
+
+  // Internet check background me start hoga.
+  InternetService.instance.initialize();
 }
 
 class JambooApp extends StatelessWidget {
@@ -44,6 +49,54 @@ class JambooApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: "Jamboo",
+
+      builder: (context, child) {
+        return ValueListenableBuilder<bool?>(
+          valueListenable: InternetService.instance.isOnline,
+
+          // IMPORTANT:
+          // MaterialApp ka actual app child yahan pass karna zaroori hai.
+          child: child,
+
+          builder: (
+            context,
+            isOnline,
+            currentChild,
+          ) {
+            // Internet status abhi check ho raha hai.
+            // Existing app normally show hoga.
+            if (isOnline == null) {
+              return currentChild ??
+                  const SizedBox.shrink();
+            }
+
+            // Internet available hai.
+            if (isOnline) {
+              return currentChild ??
+                  const SizedBox.shrink();
+            }
+
+            // Internet nahi hai.
+            return Stack(
+              children: [
+                if (currentChild != null)
+                  currentChild,
+
+                Positioned.fill(
+                  child: OfflineScreen(
+                    onTryAgain: () async {
+                      await InternetService
+                          .instance
+                          .checkNow();
+                    },
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+
       home: const SplashScreen(),
     );
   }
@@ -111,13 +164,19 @@ class _SplashScreenState extends State<SplashScreen>
                     width: 170,
                     height: 5,
                     child: ClipRRect(
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius:
+                          BorderRadius.circular(10),
                       child: AnimatedBuilder(
                         animation: _loaderController,
-                        builder: (context, child) {
+                        builder: (
+                          context,
+                          child,
+                        ) {
                           return CustomPaint(
-                            painter: _SplashLoaderPainter(
-                              progress: _loaderController.value,
+                            painter:
+                                _SplashLoaderPainter(
+                              progress:
+                                  _loaderController.value,
                             ),
                           );
                         },
@@ -153,7 +212,10 @@ class _SplashLoaderPainter extends CustomPainter {
   });
 
   @override
-  void paint(Canvas canvas, Size size) {
+  void paint(
+    Canvas canvas,
+    Size size,
+  ) {
     final backgroundPaint = Paint()
       ..color = Colors.white24
       ..style = PaintingStyle.fill;
@@ -170,7 +232,8 @@ class _SplashLoaderPainter extends CustomPainter {
         5,
       );
 
-    final backgroundRect = RRect.fromRectAndRadius(
+    final backgroundRect =
+        RRect.fromRectAndRadius(
       Offset.zero & size,
       const Radius.circular(10),
     );
@@ -186,7 +249,8 @@ class _SplashLoaderPainter extends CustomPainter {
         (size.width + segmentWidth) * progress -
         segmentWidth;
 
-    final glowRect = RRect.fromRectAndRadius(
+    final glowRect =
+        RRect.fromRectAndRadius(
       Rect.fromLTWH(
         startX,
         0,
@@ -201,7 +265,8 @@ class _SplashLoaderPainter extends CustomPainter {
       glowPaint,
     );
 
-    final progressRect = RRect.fromRectAndRadius(
+    final progressRect =
+        RRect.fromRectAndRadius(
       Rect.fromLTWH(
         startX,
         0,

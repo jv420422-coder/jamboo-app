@@ -7,7 +7,12 @@ import '../screens/saved_addresses_screen.dart';
 import '../services/notification_service.dart';
 
 class HeaderWidget extends StatelessWidget {
-  const HeaderWidget({super.key});
+  final VoidCallback? onLocationTap;
+
+  const HeaderWidget({
+    super.key,
+    this.onLocationTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -35,13 +40,17 @@ class HeaderWidget extends StatelessWidget {
           Expanded(
             child: GestureDetector(
               onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const SavedAddressesScreen(),
-                  ),
-                );
-              },
+  if (onLocationTap != null) {
+    onLocationTap!();
+  } else {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const SavedAddressesScreen(),
+      ),
+    );
+  }
+},
               child: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
                 stream: FirebaseFirestore.instance
                     .collection('users')

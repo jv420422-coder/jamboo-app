@@ -81,9 +81,7 @@ class _JambooAIScreenState extends State<JambooAIScreen> {
           CachedNetworkImageProvider(imageUrl),
           context,
         );
-      } catch (_) {
-        // Image loading failure is handled by the card itself.
-      }
+      } catch (_) {}
     }
   }
 
@@ -160,7 +158,6 @@ class _JambooAIScreenState extends State<JambooAIScreen> {
 
       _scrollToBottom();
 
-      // Recommendation images ko background me preload karo.
       _preloadRecommendationImages(
         recommendations,
       );
@@ -239,25 +236,130 @@ class _JambooAIScreenState extends State<JambooAIScreen> {
                 .toInt(),
       );
 
-      await _cartService.addToCart(cartItem);
+      final added =
+          await _cartService
+              .addToCartWithRestaurantCheck(
+        cartItem,
+      );
+
+      if (added) {
+        if (!mounted) {
+          return;
+        }
+
+        setState(() {
+          _addingItems.remove(itemId);
+          _addedItems.add(itemId);
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              "${item["name"]} cart me add ho gaya ✓",
+            ),
+            duration:
+                const Duration(seconds: 2),
+          ),
+        );
+
+        return;
+      }
+
+      final previousRestaurantName =
+          await _cartService
+              .getCurrentRestaurantName();
 
       if (!mounted) {
         return;
       }
 
-      setState(() {
-        _addingItems.remove(itemId);
-        _addedItems.add(itemId);
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            "${item["name"]} cart me add ho gaya ✓",
-          ),
-          duration: const Duration(seconds: 2),
-        ),
+      final replaceCart =
+          await showDialog<bool>(
+        context: context,
+        builder: (context) {
+          return AlertDialog(
+            title: const Text(
+              "Replace cart?",
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            content: Text(
+              "Your cart contains items from "
+              "${previousRestaurantName ?? "another restaurant"}.\n\n"
+              "Do you want to remove those items and "
+              "add this item from "
+              "${cartItem.restaurantName}?",
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(
+                    context,
+                    false,
+                  );
+                },
+                child: const Text(
+                  "Keep Cart",
+                ),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(
+                    context,
+                    true,
+                  );
+                },
+                style:
+                    ElevatedButton.styleFrom(
+                  backgroundColor:
+                      Colors.deepPurple,
+                  foregroundColor:
+                      Colors.white,
+                ),
+                child: const Text(
+                  "Replace Cart",
+                ),
+              ),
+            ],
+          );
+        },
       );
+
+      if (replaceCart == true) {
+        await _cartService.clearCart();
+
+        await _cartService.addToCart(
+          cartItem,
+        );
+
+        if (!mounted) {
+          return;
+        }
+
+        setState(() {
+          _addingItems.remove(itemId);
+          _addedItems.add(itemId);
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              "${item["name"]} cart me add ho gaya ✓",
+            ),
+            duration:
+                const Duration(seconds: 2),
+          ),
+        );
+      } else {
+        if (!mounted) {
+          return;
+        }
+
+        setState(() {
+          _addingItems.remove(itemId);
+        });
+      }
     } catch (error) {
       if (!mounted) {
         return;
@@ -278,7 +380,8 @@ class _JambooAIScreenState extends State<JambooAIScreen> {
 
   Widget suggestionChip(String text) {
     return InkWell(
-      borderRadius: BorderRadius.circular(12),
+      borderRadius:
+          BorderRadius.circular(12),
       onTap: () {
         if (isTyping) {
           return;
@@ -288,28 +391,34 @@ class _JambooAIScreenState extends State<JambooAIScreen> {
         sendMessage();
       },
       child: Container(
-        padding: const EdgeInsets.symmetric(
+        padding:
+            const EdgeInsets.symmetric(
           horizontal: 8,
           vertical: 6,
         ),
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: const Color(0xFFF3E8FF),
+          color:
+              const Color(0xFFF3E8FF),
           borderRadius:
               BorderRadius.circular(12),
           border: Border.all(
-            color: Colors.deepPurple.shade200,
+            color:
+                Colors.deepPurple.shade200,
           ),
         ),
         child: Text(
           text,
           textAlign: TextAlign.center,
           maxLines: 2,
-          overflow: TextOverflow.ellipsis,
+          overflow:
+              TextOverflow.ellipsis,
           style: const TextStyle(
             fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: Colors.deepPurple,
+            fontWeight:
+                FontWeight.w600,
+            color:
+                Colors.deepPurple,
           ),
         ),
       ),
@@ -335,32 +444,39 @@ class _JambooAIScreenState extends State<JambooAIScreen> {
         (item["name"] ?? "Food item").toString();
 
     final restaurant =
-        (item["restaurantName"] ?? "Restaurant")
+        (item["restaurantName"] ??
+                "Restaurant")
             .toString();
 
     final price =
-        ((item["price"] ?? 0) as num).toDouble();
+        ((item["price"] ?? 0) as num)
+            .toDouble();
 
     final rating =
-        ((item["rating"] ?? 0) as num).toDouble();
+        ((item["rating"] ?? 0) as num)
+            .toDouble();
 
     final emoji =
         (item["emoji"] ?? "🍽️").toString();
 
     return Container(
-      margin: const EdgeInsets.only(
+      margin:
+          const EdgeInsets.only(
         top: 8,
         bottom: 8,
       ),
-      decoration: BoxDecoration(
+      decoration:
+          BoxDecoration(
         color: Colors.white,
         borderRadius:
             BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.06),
+            color: Colors.black
+                .withOpacity(0.06),
             blurRadius: 8,
-            offset: const Offset(0, 3),
+            offset:
+                const Offset(0, 3),
           ),
         ],
       ),
@@ -369,8 +485,10 @@ class _JambooAIScreenState extends State<JambooAIScreen> {
           ClipRRect(
             borderRadius:
                 const BorderRadius.only(
-              topLeft: Radius.circular(16),
-              bottomLeft: Radius.circular(16),
+              topLeft:
+                  Radius.circular(16),
+              bottomLeft:
+                  Radius.circular(16),
             ),
             child: SizedBox(
               width: 92,
@@ -434,20 +552,23 @@ class _JambooAIScreenState extends State<JambooAIScreen> {
                           FontWeight.bold,
                     ),
                   ),
-                  const SizedBox(height: 3),
+                  const SizedBox(
+                    height: 3,
+                  ),
                   Text(
                     restaurant,
                     maxLines: 1,
                     overflow:
                         TextOverflow.ellipsis,
-                    style:
-                        TextStyle(
+                    style: TextStyle(
                       fontSize: 12,
                       color:
                           Colors.grey.shade600,
                     ),
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(
+                    height: 6,
+                  ),
                   Row(
                     children: [
                       Text(
@@ -461,7 +582,9 @@ class _JambooAIScreenState extends State<JambooAIScreen> {
                               Colors.deepPurple,
                         ),
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(
+                        width: 8,
+                      ),
                       if (rating > 0)
                         Row(
                           children: [
@@ -476,7 +599,9 @@ class _JambooAIScreenState extends State<JambooAIScreen> {
                             ),
                             Text(
                               rating
-                                  .toStringAsFixed(1),
+                                  .toStringAsFixed(
+                                1,
+                              ),
                               style:
                                   const TextStyle(
                                 fontSize: 12,
@@ -498,13 +623,14 @@ class _JambooAIScreenState extends State<JambooAIScreen> {
               right: 10,
             ),
             child: InkWell(
-              onTap: isAdding || isAdded
-                  ? null
-                  : () {
-                      addRecommendationToCart(
-                        item,
-                      );
-                    },
+              onTap:
+                  isAdding || isAdded
+                      ? null
+                      : () {
+                          addRecommendationToCart(
+                            item,
+                          );
+                        },
               borderRadius:
                   BorderRadius.circular(24),
               child: CircleAvatar(
@@ -520,14 +646,16 @@ class _JambooAIScreenState extends State<JambooAIScreen> {
                         child:
                             CircularProgressIndicator(
                           strokeWidth: 2,
-                          color: Colors.white,
+                          color:
+                              Colors.white,
                         ),
                       )
                     : Icon(
                         isAdded
                             ? Icons.check
                             : Icons.add,
-                        color: Colors.white,
+                        color:
+                            Colors.white,
                       ),
               ),
             ),
@@ -545,14 +673,17 @@ class _JambooAIScreenState extends State<JambooAIScreen> {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(
+    BuildContext context,
+  ) {
     return Scaffold(
       backgroundColor:
           const Color(0xFFF5F0FF),
       appBar: AppBar(
         backgroundColor:
             Colors.deepPurple,
-        foregroundColor: Colors.white,
+        foregroundColor:
+            Colors.white,
         elevation: 0,
         title: Row(
           children: [
@@ -564,12 +695,15 @@ class _JambooAIScreenState extends State<JambooAIScreen> {
                 fit: BoxFit.cover,
               ),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(
+              width: 10,
+            ),
             const Text(
               "Jamboo AI",
               style: TextStyle(
                 fontSize: 22,
-                fontWeight: FontWeight.bold,
+                fontWeight:
+                    FontWeight.bold,
               ),
             ),
           ],
@@ -579,10 +713,12 @@ class _JambooAIScreenState extends State<JambooAIScreen> {
         children: [
           Expanded(
             child: ListView.builder(
-              controller: _scrollController,
+              controller:
+                  _scrollController,
               padding:
                   const EdgeInsets.all(16),
-              itemCount: messages.length,
+              itemCount:
+                  messages.length,
               itemBuilder:
                   (context, index) {
                 final msg =
@@ -591,29 +727,33 @@ class _JambooAIScreenState extends State<JambooAIScreen> {
                 if (index == 0) {
                   return Column(
                     crossAxisAlignment:
-                        CrossAxisAlignment.start,
+                        CrossAxisAlignment
+                            .start,
                     children: [
                       Align(
                         alignment:
-                            Alignment.centerLeft,
+                            Alignment
+                                .centerLeft,
                         child: Container(
                           margin:
-                              const EdgeInsets.only(
+                              const EdgeInsets
+                                  .only(
                             bottom: 12,
                           ),
                           padding:
-                              const EdgeInsets.all(
-                            14,
-                          ),
+                              const EdgeInsets
+                                  .all(14),
                           constraints:
                               const BoxConstraints(
                             maxWidth: 330,
                           ),
                           decoration:
                               BoxDecoration(
-                            color: Colors.white,
+                            color:
+                                Colors.white,
                             borderRadius:
-                                BorderRadius.circular(
+                                BorderRadius
+                                    .circular(
                               15,
                             ),
                           ),
@@ -622,8 +762,8 @@ class _JambooAIScreenState extends State<JambooAIScreen> {
                             style:
                                 const TextStyle(
                               fontSize: 14,
-                              color:
-                                  Colors.black87,
+                              color: Colors
+                                  .black87,
                             ),
                           ),
                         ),
@@ -639,7 +779,9 @@ class _JambooAIScreenState extends State<JambooAIScreen> {
                             width:
                                 MediaQuery.of(
                                           context,
-                                        ).size.width /
+                                        )
+                                            .size
+                                            .width /
                                     2 -
                                 24,
                             child:
@@ -651,7 +793,9 @@ class _JambooAIScreenState extends State<JambooAIScreen> {
                             width:
                                 MediaQuery.of(
                                           context,
-                                        ).size.width /
+                                        )
+                                            .size
+                                            .width /
                                     2 -
                                 24,
                             child:
@@ -663,7 +807,9 @@ class _JambooAIScreenState extends State<JambooAIScreen> {
                             width:
                                 MediaQuery.of(
                                           context,
-                                        ).size.width /
+                                        )
+                                            .size
+                                            .width /
                                     2 -
                                 24,
                             child:
@@ -675,7 +821,9 @@ class _JambooAIScreenState extends State<JambooAIScreen> {
                             width:
                                 MediaQuery.of(
                                           context,
-                                        ).size.width /
+                                        )
+                                            .size
+                                            .width /
                                     2 -
                                 24,
                             child:
@@ -687,7 +835,9 @@ class _JambooAIScreenState extends State<JambooAIScreen> {
                             width:
                                 MediaQuery.of(
                                           context,
-                                        ).size.width /
+                                        )
+                                            .size
+                                            .width /
                                     2 -
                                 24,
                             child:
@@ -699,7 +849,9 @@ class _JambooAIScreenState extends State<JambooAIScreen> {
                             width:
                                 MediaQuery.of(
                                           context,
-                                        ).size.width /
+                                        )
+                                            .size
+                                            .width /
                                     2 -
                                 24,
                             child:
@@ -723,54 +875,68 @@ class _JambooAIScreenState extends State<JambooAIScreen> {
                   crossAxisAlignment:
                       msg["isUser"]
                           ? CrossAxisAlignment.end
-                          : CrossAxisAlignment.start,
+                          : CrossAxisAlignment
+                              .start,
                   children: [
                     Align(
                       alignment:
                           msg["isUser"]
-                              ? Alignment.centerRight
-                              : Alignment.centerLeft,
+                              ? Alignment
+                                  .centerRight
+                              : Alignment
+                                  .centerLeft,
                       child: Container(
                         margin:
-                            const EdgeInsets.only(
+                            const EdgeInsets
+                                .only(
                           bottom: 8,
                         ),
                         padding:
-                            const EdgeInsets.all(
-                          14,
-                        ),
+                            const EdgeInsets
+                                .all(14),
                         constraints:
                             const BoxConstraints(
                           maxWidth: 300,
                         ),
                         decoration:
                             BoxDecoration(
-                          color: msg["isUser"]
-                              ? Colors.deepPurple
-                              : Colors.white,
+                          color:
+                              msg["isUser"]
+                                  ? Colors
+                                      .deepPurple
+                                  : Colors
+                                      .white,
                           borderRadius:
-                              BorderRadius.circular(
+                              BorderRadius
+                                  .circular(
                             18,
                           ),
                         ),
                         child: Text(
                           msg["text"],
                           style: TextStyle(
-                            color: msg["isUser"]
-                                ? Colors.white
-                                : Colors.black87,
+                            color:
+                                msg["isUser"]
+                                    ? Colors
+                                        .white
+                                    : Colors
+                                        .black87,
                             fontSize: 15,
                           ),
                         ),
                       ),
                     ),
                     if (!msg["isUser"] &&
-                        recommendations is List &&
-                        recommendations.isNotEmpty)
-                      ...recommendations.map(
+                        recommendations
+                            is List &&
+                        recommendations
+                            .isNotEmpty)
+                      ...recommendations
+                          .map(
                         (item) {
                           return recommendationCard(
-                            Map<String, dynamic>.from(
+                            Map<String,
+                                dynamic>.from(
                               item,
                             ),
                           );
@@ -783,7 +949,8 @@ class _JambooAIScreenState extends State<JambooAIScreen> {
           ),
           if (isTyping)
             const Padding(
-              padding: EdgeInsets.only(
+              padding:
+                  EdgeInsets.only(
                 left: 16,
                 right: 16,
                 bottom: 8,
@@ -796,7 +963,8 @@ class _JambooAIScreenState extends State<JambooAIScreen> {
                   style: TextStyle(
                     color: Colors.grey,
                     fontSize: 14,
-                    fontStyle: FontStyle.italic,
+                    fontStyle:
+                        FontStyle.italic,
                   ),
                 ),
               ),
@@ -811,9 +979,11 @@ class _JambooAIScreenState extends State<JambooAIScreen> {
                   child: TextField(
                     controller:
                         _controller,
-                    enabled: !isTyping,
+                    enabled:
+                        !isTyping,
                     textInputAction:
-                        TextInputAction.send,
+                        TextInputAction
+                            .send,
                     onSubmitted: (_) {
                       sendMessage();
                     },
@@ -823,11 +993,13 @@ class _JambooAIScreenState extends State<JambooAIScreen> {
                           "Ask Jamboo AI...",
                       filled: true,
                       fillColor:
-                          Colors.grey.shade100,
+                          Colors.grey
+                              .shade100,
                       border:
                           OutlineInputBorder(
                         borderRadius:
-                            BorderRadius.circular(
+                            BorderRadius
+                                .circular(
                           30,
                         ),
                         borderSide:
@@ -844,12 +1016,15 @@ class _JambooAIScreenState extends State<JambooAIScreen> {
                   backgroundColor:
                       Colors.deepPurple,
                   child: IconButton(
-                    onPressed: isTyping
-                        ? null
-                        : sendMessage,
-                    icon: const Icon(
+                    onPressed:
+                        isTyping
+                            ? null
+                            : sendMessage,
+                    icon:
+                        const Icon(
                       Icons.send,
-                      color: Colors.white,
+                      color:
+                          Colors.white,
                     ),
                   ),
                 ),

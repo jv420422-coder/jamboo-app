@@ -112,9 +112,22 @@ class _OrderDetailsScreenState
                   .replaceAll(" ", "")
                   .replaceAll("_", "");
 
+          // Track Order button is available ONLY
+          // when the rider has the order and it is
+          // actually Out For Delivery.
           final canTrackOrder =
-              normalizedOrderStatus == "pickedup" ||
-              normalizedOrderStatus == "outfordelivery";
+              normalizedOrderStatus ==
+                  "outfordelivery";
+
+          // Show the information message before
+          // Out For Delivery, so customer knows that
+          // live tracking is coming.
+          final showTrackingInfo =
+              normalizedOrderStatus !=
+                      "delivered" &&
+                  normalizedOrderStatus !=
+                      "cancelled" &&
+                  !canTrackOrder;
 
           return SingleChildScrollView(
             physics: const BouncingScrollPhysics(),
@@ -156,7 +169,47 @@ class _OrderDetailsScreenState
                   },
                 ),
 
+                // ---------------------------------------------------------
+                // LIVE TRACKING
+                // ---------------------------------------------------------
+                if (canTrackOrder) ...[
+                  const SizedBox(height: 14),
+
+                  _LiveTrackingButton(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              LiveTrackingScreen(
+                            orderId:
+                                order.orderId,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ],
+
+                // ---------------------------------------------------------
+                // TRACKING INFORMATION BEFORE OUT FOR DELIVERY
+                // ---------------------------------------------------------
+                if (showTrackingInfo) ...[
+                  const SizedBox(height: 14),
+
+                  const _LiveTrackingInfoCard(),
+                ],
+
                 const SizedBox(height: 16),
+
+                // ---------------------------------------------------------
+                // ORDER NUMBER + CUSTOMER DELIVERY OTP
+                // ---------------------------------------------------------
+                _OrderNumberAndOtpCard(
+                  orderNumber: order.orderNumber,
+                ),
+
+                const SizedBox(height: 12),
 
                 RestaurantInfoCard(
                   order: order,
@@ -179,54 +232,6 @@ class _OrderDetailsScreenState
                 BillSummaryCard(
                   order: order,
                 ),
-
-                if (canTrackOrder) ...[
-                  const SizedBox(height: 12),
-
-                  SizedBox(
-                    width: double.infinity,
-                    height: 48,
-                    child: ElevatedButton.icon(
-                      icon: const Icon(
-                        Icons.location_on_rounded,
-                        size: 19,
-                      ),
-                      label: const Text(
-                        "Track Order",
-                        style: TextStyle(
-                          fontSize: 13.5,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor:
-                            const Color(0xFFEAF8EE),
-                        foregroundColor:
-                            Colors.green.shade700,
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius:
-                              BorderRadius.circular(13),
-                          side: BorderSide(
-                            color: Colors.green.shade100,
-                          ),
-                        ),
-                      ),
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) =>
-                                LiveTrackingScreen(
-                              orderId:
-                                  order.orderId,
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ],
 
                 const SizedBox(height: 12),
 
@@ -435,6 +440,335 @@ class _OrderDetailsScreenState
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+// ===========================================================================
+// LIVE TRACKING BUTTON
+// ===========================================================================
+
+class _LiveTrackingButton extends StatelessWidget {
+  final VoidCallback onPressed;
+
+  const _LiveTrackingButton({
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [
+            Color(0xFF7E57C2),
+            Color(0xFF6A45B8),
+          ],
+        ),
+        borderRadius:
+            BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF7E57C2)
+                .withValues(alpha: 0.20),
+            blurRadius: 12,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onPressed,
+          borderRadius:
+              BorderRadius.circular(16),
+          child: Padding(
+            padding:
+                const EdgeInsets.symmetric(
+              horizontal: 18,
+              vertical: 15,
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: Colors.white
+                        .withValues(alpha: 0.18),
+                    borderRadius:
+                        BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.delivery_dining_rounded,
+                    color: Colors.white,
+                    size: 24,
+                  ),
+                ),
+
+                const SizedBox(width: 13),
+
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment:
+                        CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "Track Your Order",
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight:
+                              FontWeight.w700,
+                        ),
+                      ),
+                      SizedBox(height: 3),
+                      Text(
+                        "Follow your delivery partner live",
+                        style: TextStyle(
+                          color: Colors.white70,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  color: Colors.white,
+                  size: 18,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ===========================================================================
+// LIVE TRACKING INFORMATION CARD
+// ===========================================================================
+
+class _LiveTrackingInfoCard
+    extends StatelessWidget {
+  const _LiveTrackingInfoCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(15),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius:
+            BorderRadius.circular(16),
+        border: Border.all(
+          color: const Color(0xFFE5D9FF),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment:
+            CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: const Color(0xFFF5F0FF),
+              borderRadius:
+                  BorderRadius.circular(12),
+            ),
+            child: const Icon(
+              Icons.location_searching_rounded,
+              color: Color(0xFF7E57C2),
+              size: 22,
+            ),
+          ),
+
+          const SizedBox(width: 12),
+
+          const Expanded(
+            child: Column(
+              crossAxisAlignment:
+                  CrossAxisAlignment.start,
+              children: [
+                Text(
+                  "Live Tracking",
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF171717),
+                  ),
+                ),
+
+                SizedBox(height: 4),
+
+                Text(
+                  "Live tracking will be available once your rider picks up your order and it is Out for Delivery.",
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    height: 1.4,
+                    color: Colors.black54,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ===========================================================================
+// ORDER NUMBER + DELIVERY OTP CARD
+// ===========================================================================
+
+class _OrderNumberAndOtpCard
+    extends StatelessWidget {
+  final String orderNumber;
+
+  const _OrderNumberAndOtpCard({
+    required this.orderNumber,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final digits = orderNumber.replaceAll(
+      RegExp(r'[^0-9]'),
+      '',
+    );
+
+    final String deliveryOtp =
+        digits.length >= 4
+            ? digits.substring(0, 4)
+            : "----";
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius:
+            BorderRadius.circular(16),
+        border: Border.all(
+          color: const Color(0xFFE5D9FF),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment:
+            CrossAxisAlignment.start,
+        children: [
+          const Text(
+            "Order Information",
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF171717),
+            ),
+          ),
+
+          const SizedBox(height: 14),
+
+          Row(
+            children: [
+              const Icon(
+                Icons.receipt_long_rounded,
+                size: 20,
+                color: Color(0xFF7E57C2),
+              ),
+
+              const SizedBox(width: 10),
+
+              const Text(
+                "Order No.",
+                style: TextStyle(
+                  color: Colors.grey,
+                  fontSize: 13,
+                ),
+              ),
+
+              const Spacer(),
+
+              Flexible(
+                child: Text(
+                  orderNumber,
+                  textAlign: TextAlign.right,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF171717),
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 14),
+
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF5F0FF),
+              borderRadius:
+                  BorderRadius.circular(14),
+            ),
+            child: Row(
+              children: [
+                const Text(
+                  "🏠",
+                  style: TextStyle(
+                    fontSize: 24,
+                  ),
+                ),
+
+                const SizedBox(width: 12),
+
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment:
+                        CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "Delivery OTP",
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.grey,
+                        ),
+                      ),
+
+                      SizedBox(height: 3),
+
+                      Text(
+                        "Share this OTP with the rider",
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.black54,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                Text(
+                  deliveryOtp,
+                  style: const TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 2,
+                    color: Color(0xFF7E57C2),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

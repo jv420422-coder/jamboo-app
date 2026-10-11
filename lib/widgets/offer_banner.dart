@@ -1,8 +1,8 @@
 import 'dart:async';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 
 import '../screens/restaurant_details_screen.dart';
 import '../screens/search_results_screen.dart';
@@ -20,45 +20,49 @@ class _OfferBannerState extends State<OfferBanner> {
   int _currentPage = 0;
 
   final List<String> _fallbackBanners = [
-    "assets/images/offer_banner1.png",
-    "assets/images/offer_banner2.png",
-    "assets/images/offer_banner3.png",
+    'assets/images/offer_banner1.png',
+    'assets/images/offer_banner2.png',
+    'assets/images/offer_banner3.png',
   ];
 
   Timer? _timer;
 
   List<Map<String, dynamic>> _promotions = [];
 
-  bool _isLoading = true;
-
   @override
   void initState() {
     super.initState();
 
+    // Promotions background mein load hongi.
+    // Fallback banner immediately show hoga.
     _loadPromotions();
 
     _timer = Timer.periodic(
       const Duration(seconds: 3),
       (timer) {
-        if (_pageController.hasClients) {
-          final bannerCount = _promotions.isNotEmpty
-              ? _promotions.length
-              : _fallbackBanners.length;
-
-          if (bannerCount <= 1) return;
-
-          _currentPage++;
-
-          if (_currentPage >= bannerCount) {
-            _currentPage = 0;
-          }
-
-          _pageController.animateToPage(
-            _currentPage,
-            duration: const Duration(milliseconds: 500),
-            curve: Curves.easeInOut,
-          );
+        if (!_pageController.hasClients) {
+          return;
         }
+
+        final bannerCount = _promotions.isNotEmpty
+            ? _promotions.length
+            : _fallbackBanners.length;
+
+        if (bannerCount <= 1) {
+          return;
+        }
+
+        _currentPage++;
+
+        if (_currentPage >= bannerCount) {
+          _currentPage = 0;
+        }
+
+        _pageController.animateToPage(
+          _currentPage,
+          duration: const Duration(milliseconds: 500),
+          curve: Curves.easeInOut,
+        );
       },
     );
   }
@@ -78,21 +82,32 @@ class _OfferBannerState extends State<OfferBanner> {
     try {
       final snapshot = await FirebaseFirestore.instance
           .collection('promotions')
-.where('placement', isEqualTo: 'home_top_banner')
-.where('isActive', isEqualTo: true)
-.where('status', isEqualTo: 'active')
-.get();
+          .where(
+            'placement',
+            isEqualTo: 'home_top_banner',
+          )
+          .where(
+            'isActive',
+            isEqualTo: true,
+          )
+          .where(
+            'status',
+            isEqualTo: 'active',
+          )
+          .get();
 
       final now = DateTime.now();
 
-      final promotions = snapshot.docs.map((doc) {
-        final data = doc.data();
+      final promotions = snapshot.docs
+          .map((doc) {
+            final data = doc.data();
 
-        return {
-          'id': doc.id,
-          ...data,
-        };
-      }).where((promotion) {
+            return {
+              'id': doc.id,
+              ...data,
+            };
+          })
+          .where((promotion) {
         final status =
             (promotion['status'] ?? '').toString();
 
@@ -101,21 +116,28 @@ class _OfferBannerState extends State<OfferBanner> {
         }
 
         final startAt =
-            _dateTimeFromFirestore(promotion['startAt']);
+            _dateTimeFromFirestore(
+          promotion['startAt'],
+        );
 
         final endAt =
-            _dateTimeFromFirestore(promotion['endAt']);
+            _dateTimeFromFirestore(
+          promotion['endAt'],
+        );
 
-        if (startAt != null && now.isBefore(startAt)) {
+        if (startAt != null &&
+            now.isBefore(startAt)) {
           return false;
         }
 
-        if (endAt != null && now.isAfter(endAt)) {
+        if (endAt != null &&
+            now.isAfter(endAt)) {
           return false;
         }
 
         return true;
-      }).toList();
+      })
+          .toList();
 
       promotions.sort((a, b) {
         final priorityA =
@@ -137,11 +159,12 @@ class _OfferBannerState extends State<OfferBanner> {
         return orderA.compareTo(orderB);
       });
 
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
 
       setState(() {
         _promotions = promotions;
-        _isLoading = false;
         _currentPage = 0;
       });
     } catch (e) {
@@ -149,11 +172,13 @@ class _OfferBannerState extends State<OfferBanner> {
         'CUSTOMER PROMOTION LOAD ERROR: $e',
       );
 
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
 
       setState(() {
         _promotions = [];
-        _isLoading = false;
+        _currentPage = 0;
       });
     }
   }
@@ -204,7 +229,7 @@ class _OfferBannerState extends State<OfferBanner> {
   }
 
   // ============================================================
-  // BANNER IMAGE
+  // PROMOTION IMAGE
   // ============================================================
 
   String _promotionImage(
@@ -213,6 +238,22 @@ class _OfferBannerState extends State<OfferBanner> {
     return (promotion['imageUrl'] ?? '')
         .toString()
         .trim();
+  }
+
+  // ============================================================
+  // FALLBACK BANNER
+  // ============================================================
+
+  Widget _fallbackBanner(int index) {
+    final fallbackIndex =
+        index % _fallbackBanners.length;
+
+    return Image.asset(
+      _fallbackBanners[fallbackIndex],
+      fit: BoxFit.cover,
+      width: double.infinity,
+      height: double.infinity,
+    );
   }
 
   // ============================================================
@@ -244,7 +285,9 @@ class _OfferBannerState extends State<OfferBanner> {
       try {
         final restaurantSnapshot =
             await FirebaseFirestore.instance
-                .collection('restaurant_registrations')
+                .collection(
+                  'restaurant_registrations',
+                )
                 .where(
                   'restaurantId',
                   isEqualTo: targetId,
@@ -252,7 +295,9 @@ class _OfferBannerState extends State<OfferBanner> {
                 .limit(1)
                 .get();
 
-        if (!mounted) return;
+        if (!mounted) {
+          return;
+        }
 
         if (restaurantSnapshot.docs.isEmpty) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -304,8 +349,7 @@ class _OfferBannerState extends State<OfferBanner> {
             builder: (context) =>
                 RestaurantDetailsScreen(
               restaurantId: targetId,
-              restaurantName:
-                  restaurantName,
+              restaurantName: restaurantName,
             ),
           ),
         );
@@ -348,7 +392,9 @@ class _OfferBannerState extends State<OfferBanner> {
                 .doc(targetId)
                 .get();
 
-        if (!mounted) return;
+        if (!mounted) {
+          return;
+        }
 
         if (!menuSnapshot.exists) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -379,7 +425,9 @@ class _OfferBannerState extends State<OfferBanner> {
 
         final restaurantSnapshot =
             await FirebaseFirestore.instance
-                .collection('restaurant_registrations')
+                .collection(
+                  'restaurant_registrations',
+                )
                 .where(
                   'restaurantId',
                   isEqualTo: restaurantId,
@@ -387,7 +435,9 @@ class _OfferBannerState extends State<OfferBanner> {
                 .limit(1)
                 .get();
 
-        if (!mounted) return;
+        if (!mounted) {
+          return;
+        }
 
         if (restaurantSnapshot.docs.isEmpty) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -430,8 +480,7 @@ class _OfferBannerState extends State<OfferBanner> {
         }
 
         final restaurantName =
-            (restaurantData[
-                        'restaurantName'] ??
+            (restaurantData['restaurantName'] ??
                     'Restaurant')
                 .toString();
 
@@ -441,8 +490,7 @@ class _OfferBannerState extends State<OfferBanner> {
             builder: (context) =>
                 RestaurantDetailsScreen(
               restaurantId: restaurantId,
-              restaurantName:
-                  restaurantName,
+              restaurantName: restaurantName,
             ),
           ),
         );
@@ -462,30 +510,6 @@ class _OfferBannerState extends State<OfferBanner> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
-      return Padding(
-        padding:
-            const EdgeInsets.symmetric(horizontal: 20),
-        child: Column(
-          children: [
-            ClipRRect(
-              borderRadius:
-                  BorderRadius.circular(22),
-              child: AspectRatio(
-                aspectRatio: 16 / 6.5,
-                child: Container(
-                  color: Colors.grey.shade200,
-                  child: const Center(
-                    child:
-                        CircularProgressIndicator(),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
     final usePromotions =
         _promotions.isNotEmpty;
 
@@ -507,6 +531,10 @@ class _OfferBannerState extends State<OfferBanner> {
                 controller:
                     _pageController,
                 onPageChanged: (index) {
+                  if (!mounted) {
+                    return;
+                  }
+
                   setState(() {
                     _currentPage = index;
                   });
@@ -530,61 +558,54 @@ class _OfferBannerState extends State<OfferBanner> {
                         );
                       },
                       child: imageUrl.isNotEmpty
-    ? CachedNetworkImage(
-        imageUrl: imageUrl,
-        fit: BoxFit.cover,
-        width: double.infinity,
-        height: double.infinity,
-        placeholder: (context, url) {
-          return Container(
-            color: Colors.grey.shade200,
-            alignment: Alignment.center,
-            child: const CircularProgressIndicator(),
-          );
-        },
-        errorWidget: (
-          context,
-          url,
-          error,
-        ) {
-          return Container(
-            color: Colors.grey.shade200,
-            alignment: Alignment.center,
-            child: const Icon(
-              Icons.image_not_supported_outlined,
-              size: 40,
-              color: Colors.grey,
-            ),
-          );
-        },
-      )
-                          : Container(
-                              color: Colors
-                                  .grey
-                                  .shade200,
-                              alignment:
-                                  Alignment.center,
-                              child:
-                                  const Icon(
-                                Icons
-                                    .image_not_supported_outlined,
-                                size: 40,
-                                color:
-                                    Colors.grey,
-                              ),
-                            ),
+                          ? CachedNetworkImage(
+                              imageUrl: imageUrl,
+                              fit: BoxFit.cover,
+                              width: double.infinity,
+                              height: double.infinity,
+
+                              // Local banner is shown
+                              // while network image loads.
+                              placeholder:
+                                  (context, url) {
+                                return _fallbackBanner(
+                                  index,
+                                );
+                              },
+
+                              // Local banner is shown
+                              // if network image fails.
+                              errorWidget: (
+                                context,
+                                url,
+                                error,
+                              ) {
+                                return _fallbackBanner(
+                                  index,
+                                );
+                              },
+
+                              // Remove fade delay.
+                              fadeInDuration:
+                                  Duration.zero,
+
+                              fadeOutDuration:
+                                  Duration.zero,
+
+                              // Keep image memory
+                              // usage reasonable.
+                              memCacheWidth: 1200,
+                            )
+                          : _fallbackBanner(index),
                     );
                   }
 
                   return GestureDetector(
                     onTap: () {
-                      // Existing static banners
+                      // Static fallback banners
                       // have no destination.
                     },
-                    child: Image.asset(
-                      _fallbackBanners[index],
-                      fit: BoxFit.cover,
-                    ),
+                    child: _fallbackBanner(index),
                   );
                 },
               ),

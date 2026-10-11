@@ -4,7 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 
 import 'restaurant_details_screen.dart';
 
-class SearchResultsScreen extends StatelessWidget {
+class SearchResultsScreen extends StatefulWidget {
   final String searchQuery;
 
   const SearchResultsScreen({
@@ -13,8 +13,16 @@ class SearchResultsScreen extends StatelessWidget {
   });
 
   @override
+  State<SearchResultsScreen> createState() =>
+      _SearchResultsScreenState();
+}
+
+class _SearchResultsScreenState
+    extends State<SearchResultsScreen> {
+  @override
   Widget build(BuildContext context) {
-    final query = searchQuery.trim().toLowerCase();
+    final query =
+        widget.searchQuery.trim().toLowerCase();
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F0FF),
@@ -31,7 +39,7 @@ class SearchResultsScreen extends StatelessWidget {
           },
         ),
         title: Text(
-          'Results for "$searchQuery"',
+          'Results for "${widget.searchQuery}"',
           style: const TextStyle(
             color: Colors.black,
             fontSize: 22,
@@ -39,7 +47,8 @@ class SearchResultsScreen extends StatelessWidget {
           ),
         ),
       ),
-      body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      body: StreamBuilder<
+          QuerySnapshot<Map<String, dynamic>>>(
         stream: FirebaseFirestore.instance
             .collection("restaurant_registrations")
             .where(
@@ -50,8 +59,15 @@ class SearchResultsScreen extends StatelessWidget {
               "isActive",
               isEqualTo: true,
             )
+            .where(
+              "isOpen",
+              isEqualTo: true,
+            )
             .snapshots(),
-        builder: (context, restaurantSnapshot) {
+        builder: (
+          context,
+          restaurantSnapshot,
+        ) {
           if (restaurantSnapshot.connectionState ==
               ConnectionState.waiting) {
             return const Center(
@@ -62,7 +78,8 @@ class SearchResultsScreen extends StatelessWidget {
           final restaurantDocs =
               restaurantSnapshot.data?.docs ?? [];
 
-          final restaurants = restaurantDocs.where((doc) {
+          final restaurants =
+              restaurantDocs.where((doc) {
             final data = doc.data();
 
             final name =
@@ -92,11 +109,15 @@ class SearchResultsScreen extends StatelessWidget {
           }).toList();
 
           return StreamBuilder<
-              QuerySnapshot<Map<String, dynamic>>>(
+              QuerySnapshot<
+                  Map<String, dynamic>>>(
             stream: FirebaseFirestore.instance
                 .collection("menu_items")
                 .snapshots(),
-            builder: (context, menuSnapshot) {
+            builder: (
+              context,
+              menuSnapshot,
+            ) {
               if (menuSnapshot.connectionState ==
                   ConnectionState.waiting) {
                 return const Center(
@@ -107,7 +128,8 @@ class SearchResultsScreen extends StatelessWidget {
               final menuDocs =
                   menuSnapshot.data?.docs ?? [];
 
-              final foodResults = menuDocs.where((doc) {
+              final foodResults =
+                  menuDocs.where((doc) {
                 final data = doc.data();
 
                 final name =
@@ -136,18 +158,21 @@ class SearchResultsScreen extends StatelessWidget {
                         .toString();
 
                 final matchingRestaurant =
-                    restaurantDocs.where((restaurantDoc) {
-                  final restaurantData =
-                      restaurantDoc.data();
+                    restaurantDocs.where(
+                  (restaurantDoc) {
+                    final restaurantData =
+                        restaurantDoc.data();
 
-                  final registeredRestaurantId =
-                      (restaurantData["restaurantId"] ??
-                              restaurantDoc.id)
-                          .toString();
+                    final registeredRestaurantId =
+                        (restaurantData[
+                                    "restaurantId"] ??
+                                restaurantDoc.id)
+                            .toString();
 
-                  return registeredRestaurantId ==
-                      restaurantId;
-                }).toList();
+                    return registeredRestaurantId ==
+                        restaurantId;
+                  },
+                ).toList();
 
                 if (matchingRestaurant.isEmpty) {
                   return false;
@@ -213,9 +238,7 @@ class SearchResultsScreen extends StatelessWidget {
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-
                     const SizedBox(height: 14),
-
                     ...foodResults.map((doc) {
                       final data = doc.data();
 
@@ -265,9 +288,6 @@ class SearchResultsScreen extends StatelessWidget {
                                   "Restaurant")
                               .toString();
 
-                      final isOpen =
-                          restaurantData["isOpen"] == true;
-
                       return GestureDetector(
                         onTap: () {
                           if (restaurantId
@@ -299,9 +319,7 @@ class SearchResultsScreen extends StatelessWidget {
                           decoration: BoxDecoration(
                             color: Colors.white,
                             borderRadius:
-                                BorderRadius.circular(
-                              18,
-                            ),
+                                BorderRadius.circular(18),
                             boxShadow: const [
                               BoxShadow(
                                 color: Colors.black12,
@@ -314,49 +332,68 @@ class SearchResultsScreen extends StatelessWidget {
                             children: [
                               ClipRRect(
                                 borderRadius:
-                                    BorderRadius
-                                        .circular(14),
+                                    BorderRadius.circular(
+                                  14,
+                                ),
                                 child: imageUrl
                                         .toString()
                                         .isNotEmpty
                                     ? CachedNetworkImage(
-  imageUrl: imageUrl.toString(),
-  width: 75,
-  height: 75,
-  fit: BoxFit.cover,
-  placeholder: (context, url) {
-    return Container(
-      width: 75,
-      height: 75,
-      color: const Color(0xFFF0E8FF),
-      child: const Center(
-        child: Icon(
-          Icons.restaurant_menu,
-          color: Colors.deepPurple,
-          size: 32,
-        ),
-      ),
-    );
-  },
-  errorWidget: (
-    context,
-    url,
-    error,
-  ) {
-    return Container(
-      width: 75,
-      height: 75,
-      color: const Color(0xFFF0E8FF),
-      child: const Center(
-        child: Icon(
-          Icons.restaurant_menu,
-          color: Colors.deepPurple,
-          size: 32,
-        ),
-      ),
-    );
-  },
-)
+                                        imageUrl:
+                                            imageUrl.toString(),
+                                        width: 75,
+                                        height: 75,
+                                        fit: BoxFit.cover,
+                                        placeholder:
+                                            (
+                                          context,
+                                          url,
+                                        ) {
+                                          return Container(
+                                            width: 75,
+                                            height: 75,
+                                            color:
+                                                const Color(
+                                              0xFFF0E8FF,
+                                            ),
+                                            child:
+                                                const Center(
+                                              child: Icon(
+                                                Icons
+                                                    .restaurant_menu,
+                                                color: Colors
+                                                    .deepPurple,
+                                                size: 32,
+                                              ),
+                                            ),
+                                          );
+                                        },
+                                        errorWidget:
+                                            (
+                                          context,
+                                          url,
+                                          error,
+                                        ) {
+                                          return Container(
+                                            width: 75,
+                                            height: 75,
+                                            color:
+                                                const Color(
+                                              0xFFF0E8FF,
+                                            ),
+                                            child:
+                                                const Center(
+                                              child: Icon(
+                                                Icons
+                                                    .restaurant_menu,
+                                                color: Colors
+                                                    .deepPurple,
+                                                size: 32,
+                                              ),
+                                            ),
+                                          );
+                                        },
+                                      )
                                     : Container(
                                         width: 75,
                                         height: 75,
@@ -376,9 +413,9 @@ class SearchResultsScreen extends StatelessWidget {
                                         ),
                                       ),
                               ),
-
-                              const SizedBox(width: 14),
-
+                              const SizedBox(
+                                width: 14,
+                              ),
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment:
@@ -386,49 +423,38 @@ class SearchResultsScreen extends StatelessWidget {
                                           .start,
                                   children: [
                                     Text(
-                                      itemName
-                                          .toString(),
+                                      itemName.toString(),
                                       maxLines: 1,
                                       overflow:
-                                          TextOverflow
-                                              .ellipsis,
+                                          TextOverflow.ellipsis,
                                       style:
                                           const TextStyle(
                                         fontSize: 18,
                                         fontWeight:
-                                            FontWeight
-                                                .bold,
+                                            FontWeight.bold,
                                       ),
                                     ),
-
                                     const SizedBox(
                                       height: 5,
                                     ),
-
                                     Text(
-                                      description
-                                          .toString(),
+                                      description.toString(),
                                       maxLines: 1,
                                       overflow:
-                                          TextOverflow
-                                              .ellipsis,
+                                          TextOverflow.ellipsis,
                                       style:
                                           const TextStyle(
-                                        color:
-                                            Colors.grey,
+                                        color: Colors.grey,
                                       ),
                                     ),
-
                                     const SizedBox(
                                       height: 5,
                                     ),
-
                                     Text(
                                       restaurantName,
                                       maxLines: 1,
                                       overflow:
-                                          TextOverflow
-                                              .ellipsis,
+                                          TextOverflow.ellipsis,
                                       style:
                                           const TextStyle(
                                         fontSize: 13,
@@ -438,58 +464,25 @@ class SearchResultsScreen extends StatelessWidget {
                                             FontWeight.w600,
                                       ),
                                     ),
-
                                     const SizedBox(
                                       height: 6,
                                     ),
-
-                                    Row(
-                                      children: [
-                                        Text(
-                                          "₹$price",
-                                          style:
-                                              const TextStyle(
-                                            fontSize: 16,
-                                            fontWeight:
-                                                FontWeight
-                                                    .bold,
-                                            color: Colors
-                                                .deepPurple,
-                                          ),
-                                        ),
-
-                                        if (!isOpen) ...[
-                                          const SizedBox(
-                                            width: 10,
-                                          ),
-                                          const Flexible(
-                                            child: Text(
-                                              "Closed today",
-                                              maxLines: 1,
-                                              overflow:
-                                                  TextOverflow
-                                                      .ellipsis,
-                                              style:
-                                                  TextStyle(
-                                                fontSize: 12,
-                                                color:
-                                                    Colors.red,
-                                                fontWeight:
-                                                    FontWeight
-                                                        .w600,
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ],
+                                    Text(
+                                      "₹$price",
+                                      style:
+                                          const TextStyle(
+                                        fontSize: 16,
+                                        fontWeight:
+                                            FontWeight.bold,
+                                        color:
+                                            Colors.deepPurple,
+                                      ),
                                     ),
                                   ],
                                 ),
                               ),
-
                               const Icon(
-                                Icons
-                                    .arrow_forward_ios,
+                                Icons.arrow_forward_ios,
                                 size: 17,
                                 color: Colors.grey,
                               ),
@@ -499,10 +492,8 @@ class SearchResultsScreen extends StatelessWidget {
                       );
                     }),
                   ],
-
                   if (restaurants.isNotEmpty) ...[
                     const SizedBox(height: 20),
-
                     const Text(
                       "🏪 Restaurants",
                       style: TextStyle(
@@ -510,19 +501,15 @@ class SearchResultsScreen extends StatelessWidget {
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-
                     const SizedBox(height: 14),
-
                     ...restaurants.map((doc) {
                       final data = doc.data();
 
                       final restaurantId =
-                          data["restaurantId"] ??
-                              doc.id;
+                          data["restaurantId"] ?? doc.id;
 
                       final restaurantName =
-                          data["restaurantName"] ??
-                              "";
+                          data["restaurantName"] ?? "";
 
                       final address =
                           data["address"] ?? "";
@@ -532,9 +519,6 @@ class SearchResultsScreen extends StatelessWidget {
 
                       final logoUrl =
                           data["logoUrl"] ?? "";
-
-                      final isOpen =
-                          data["isOpen"] == true;
 
                       final location = [
                         address,
@@ -556,11 +540,9 @@ class SearchResultsScreen extends StatelessWidget {
                               builder: (_) =>
                                   RestaurantDetailsScreen(
                                 restaurantId:
-                                    restaurantId
-                                        .toString(),
+                                    restaurantId.toString(),
                                 restaurantName:
-                                    restaurantName
-                                        .toString(),
+                                    restaurantName.toString(),
                               ),
                             ),
                           );
@@ -575,9 +557,7 @@ class SearchResultsScreen extends StatelessWidget {
                           decoration: BoxDecoration(
                             color: Colors.white,
                             borderRadius:
-                                BorderRadius.circular(
-                              18,
-                            ),
+                                BorderRadius.circular(18),
                             boxShadow: const [
                               BoxShadow(
                                 color: Colors.black12,
@@ -590,49 +570,68 @@ class SearchResultsScreen extends StatelessWidget {
                             children: [
                               ClipRRect(
                                 borderRadius:
-                                    BorderRadius
-                                        .circular(14),
+                                    BorderRadius.circular(
+                                  14,
+                                ),
                                 child: logoUrl
-        .toString()
-        .isNotEmpty
-    ? CachedNetworkImage(
-        imageUrl: logoUrl.toString(),
-        width: 70,
-        height: 70,
-        fit: BoxFit.cover,
-        placeholder: (context, url) {
-          return Container(
-            width: 70,
-            height: 70,
-            color: const Color(0xFFF0E8FF),
-            child: const Center(
-              child: Icon(
-                Icons.restaurant,
-                color: Colors.deepPurple,
-                size: 32,
-              ),
-            ),
-          );
-        },
-        errorWidget: (
-          context,
-          url,
-          error,
-        ) {
-          return Container(
-            width: 70,
-            height: 70,
-            color: const Color(0xFFF0E8FF),
-            child: const Center(
-              child: Icon(
-                Icons.restaurant,
-                color: Colors.deepPurple,
-                size: 32,
-              ),
-            ),
-          );
-        },
-      )
+                                        .toString()
+                                        .isNotEmpty
+                                    ? CachedNetworkImage(
+                                        imageUrl:
+                                            logoUrl.toString(),
+                                        width: 70,
+                                        height: 70,
+                                        fit: BoxFit.cover,
+                                        placeholder:
+                                            (
+                                          context,
+                                          url,
+                                        ) {
+                                          return Container(
+                                            width: 70,
+                                            height: 70,
+                                            color:
+                                                const Color(
+                                              0xFFF0E8FF,
+                                            ),
+                                            child:
+                                                const Center(
+                                              child: Icon(
+                                                Icons
+                                                    .restaurant,
+                                                color: Colors
+                                                    .deepPurple,
+                                                size: 32,
+                                              ),
+                                            ),
+                                          );
+                                        },
+                                        errorWidget:
+                                            (
+                                          context,
+                                          url,
+                                          error,
+                                        ) {
+                                          return Container(
+                                            width: 70,
+                                            height: 70,
+                                            color:
+                                                const Color(
+                                              0xFFF0E8FF,
+                                            ),
+                                            child:
+                                                const Center(
+                                              child: Icon(
+                                                Icons
+                                                    .restaurant,
+                                                color: Colors
+                                                    .deepPurple,
+                                                size: 32,
+                                              ),
+                                            ),
+                                          );
+                                        },
+                                      )
                                     : Container(
                                         width: 70,
                                         height: 70,
@@ -643,8 +642,7 @@ class SearchResultsScreen extends StatelessWidget {
                                         child:
                                             const Center(
                                           child: Icon(
-                                            Icons
-                                                .restaurant,
+                                            Icons.restaurant,
                                             color: Colors
                                                 .deepPurple,
                                             size: 32,
@@ -652,9 +650,9 @@ class SearchResultsScreen extends StatelessWidget {
                                         ),
                                       ),
                               ),
-
-                              const SizedBox(width: 14),
-
+                              const SizedBox(
+                                width: 14,
+                              ),
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment:
@@ -662,27 +660,21 @@ class SearchResultsScreen extends StatelessWidget {
                                           .start,
                                   children: [
                                     Text(
-                                      restaurantName
-                                          .toString(),
+                                      restaurantName.toString(),
                                       maxLines: 1,
                                       overflow:
-                                          TextOverflow
-                                              .ellipsis,
+                                          TextOverflow.ellipsis,
                                       style:
                                           const TextStyle(
                                         fontSize: 18,
                                         fontWeight:
-                                            FontWeight
-                                                .bold,
+                                            FontWeight.bold,
                                       ),
                                     ),
-
                                     const SizedBox(
                                       height: 5,
                                     ),
-
-                                    if (location
-                                        .isNotEmpty)
+                                    if (location.isNotEmpty)
                                       Text(
                                         location,
                                         maxLines: 1,
@@ -691,40 +683,17 @@ class SearchResultsScreen extends StatelessWidget {
                                                 .ellipsis,
                                         style:
                                             const TextStyle(
-                                          color:
-                                              Colors.grey,
+                                          color: Colors.grey,
                                         ),
                                       ),
-
-                                    if (!isOpen) ...[
-                                      const SizedBox(
-                                        height: 6,
-                                      ),
-                                      const Text(
-                                        "This restaurant is closed today",
-                                        style: TextStyle(
-                                          color: Colors.red,
-                                          fontSize: 13,
-                                          fontWeight:
-                                              FontWeight.w600,
-                                        ),
-                                      ),
-                                    ],
                                   ],
                                 ),
                               ),
-
                               const SizedBox(width: 8),
-
-                              Icon(
-                                isOpen
-                                    ? Icons
-                                        .arrow_forward_ios
-                                    : Icons.lock_outline,
+                              const Icon(
+                                Icons.arrow_forward_ios,
                                 size: 17,
-                                color: isOpen
-                                    ? Colors.grey
-                                    : Colors.red,
+                                color: Colors.grey,
                               ),
                             ],
                           ),

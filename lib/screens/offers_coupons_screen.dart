@@ -1,5 +1,8 @@
+import 'dart:convert';
+
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class OffersCouponsScreen extends StatefulWidget {
   final String? restaurantId;
@@ -34,6 +37,15 @@ class _OffersCouponsScreenState
     region: 'us-central1',
   );
 
+  static const String _cacheKey =
+      'jamboo_customer_coupons_cache';
+
+  static const Duration _cacheDuration =
+      Duration(minutes: 10);
+
+  static const Duration _cartCacheDuration =
+      Duration(minutes: 2);
+
   @override
   void initState() {
     super.initState();
@@ -41,33 +53,93 @@ class _OffersCouponsScreenState
   }
 
   Future<void> _loadCoupons() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
+    if (widget.isCartMode) {
+      await _loadCachedCartCoupons();
 
-    try {
-      final functionName =
-          widget.isCartMode
-              ? 'getAvailableCoupons'
-              : 'getCustomerCoupons';
-
-      final callable =
-          _functions.httpsCallable(
-        functionName,
-      );
-
-      final Map<String, dynamic> requestData = {};
-
-      if (widget.isCartMode) {
-        requestData['restaurantId'] =
-            widget.restaurantId;
-        requestData['subtotal'] =
-            widget.subtotal;
+      if (!mounted) {
+        return;
       }
 
+      await _refreshCartCoupons();
+      return;
+    }
+
+    await _loadCachedCoupons();
+
+    if (!mounted) {
+      return;
+    }
+
+    await _refreshCustomerCoupons();
+  }
+
+  Future<void> _loadCachedCoupons() async {
+    try {
+      final prefs =
+          await SharedPreferences.getInstance();
+
+      final cachedData =
+          prefs.getString(_cacheKey);
+
+      final cachedTime =
+          prefs.getInt(
+        '${_cacheKey}_time',
+      );
+
+      if (cachedData == null ||
+          cachedTime == null) {
+        return;
+      }
+
+      final cacheAge =
+          DateTime.now().millisecondsSinceEpoch -
+              cachedTime;
+
+      if (cacheAge >
+          _cacheDuration.inMilliseconds) {
+        return;
+      }
+
+      final decoded =
+          jsonDecode(cachedData);
+
+      if (decoded is! List) {
+        return;
+      }
+
+      final coupons = decoded
+          .map(
+            (coupon) =>
+                Map<String, dynamic>.from(
+              coupon as Map,
+            ),
+          )
+          .toList();
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _coupons = coupons;
+        _isLoading = false;
+        _errorMessage = null;
+      });
+    } catch (_) {
+      // Cache failure should never block
+      // fresh coupon loading.
+    }
+  }
+
+  Future<void> _refreshCustomerCoupons() async {
+    try {
+      final callable =
+          _functions.httpsCallable(
+        'getCustomerCoupons',
+      );
+
       final response =
-          await callable.call(requestData);
+          await callable.call({});
 
       final data =
           Map<String, dynamic>.from(
@@ -88,23 +160,232 @@ class _OffersCouponsScreenState
           )
           .toList();
 
-      if (!mounted) return;
+      await _saveCouponsToCache(coupons);
+
+      if (!mounted) {
+        return;
+      }
 
       setState(() {
         _coupons = coupons;
         _isLoading = false;
+        _errorMessage = null;
       });
     } on FirebaseFunctionsException catch (e) {
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
+
+      if (_coupons.isNotEmpty) {
+        return;
+      }
 
       setState(() {
         _isLoading = false;
         _errorMessage =
             e.message ??
-            'Unable to load coupons.';
+                'Unable to load coupons.';
       });
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
+
+      if (_coupons.isNotEmpty) {
+        return;
+      }
+
+      setState(() {
+        _isLoading = false;
+        _errorMessage =
+            'Unable to load coupons. Please try again.';
+      });
+    }
+  }
+
+  Future<void> _saveCouponsToCache(
+    List<Map<String, dynamic>> coupons,
+  ) async {
+    try {
+      final prefs =
+          await SharedPreferences.getInstance();
+
+      await prefs.setString(
+        _cacheKey,
+        jsonEncode(coupons),
+      );
+
+      await prefs.setInt(
+        '${_cacheKey}_time',
+        DateTime.now()
+            .millisecondsSinceEpoch,
+      );
+    } catch (_) {
+      // Cache failure should not affect
+      // coupon functionality.
+    }
+  }
+
+  String get _cartCacheKey {
+    final restaurantId =
+        widget.restaurantId!.trim();
+
+    final subtotal =
+        widget.subtotal!.toStringAsFixed(2);
+
+    return 'jamboo_cart_coupons_${restaurantId}_$subtotal';
+  }
+
+  String get _cartCacheTimeKey =>
+      '${_cartCacheKey}_time';
+
+  Future<void> _loadCachedCartCoupons() async {
+    try {
+      final prefs =
+          await SharedPreferences.getInstance();
+
+      final cachedData =
+          prefs.getString(_cartCacheKey);
+
+      final cachedTime =
+          prefs.getInt(_cartCacheTimeKey);
+
+      if (cachedData == null ||
+          cachedTime == null) {
+        return;
+      }
+
+      final cacheAge =
+          DateTime.now().millisecondsSinceEpoch -
+              cachedTime;
+
+      if (cacheAge >
+          _cartCacheDuration.inMilliseconds) {
+        return;
+      }
+
+      final decoded =
+          jsonDecode(cachedData);
+
+      if (decoded is! List) {
+        return;
+      }
+
+      final coupons = decoded
+          .map(
+            (coupon) =>
+                Map<String, dynamic>.from(
+              coupon as Map,
+            ),
+          )
+          .toList();
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _coupons = coupons;
+        _isLoading = false;
+        _errorMessage = null;
+      });
+    } catch (_) {
+      // Cache failure should never block
+      // fresh coupon loading.
+    }
+  }
+
+  Future<void> _saveCartCouponsToCache(
+    List<Map<String, dynamic>> coupons,
+  ) async {
+    try {
+      final prefs =
+          await SharedPreferences.getInstance();
+
+      await prefs.setString(
+        _cartCacheKey,
+        jsonEncode(coupons),
+      );
+
+      await prefs.setInt(
+        _cartCacheTimeKey,
+        DateTime.now()
+            .millisecondsSinceEpoch,
+      );
+    } catch (_) {
+      // Cache failure should not affect
+      // coupon functionality.
+    }
+  }
+
+  Future<void> _refreshCartCoupons() async {
+    try {
+      final callable =
+          _functions.httpsCallable(
+        'getAvailableCoupons',
+      );
+
+      final response =
+          await callable.call({
+        'restaurantId':
+            widget.restaurantId,
+        'subtotal':
+            widget.subtotal,
+      });
+
+      final data =
+          Map<String, dynamic>.from(
+        response.data as Map,
+      );
+
+      final rawCoupons =
+          data['coupons'] is List
+              ? data['coupons'] as List
+              : [];
+
+      final coupons = rawCoupons
+          .map(
+            (coupon) =>
+                Map<String, dynamic>.from(
+              coupon as Map,
+            ),
+          )
+          .toList();
+
+      await _saveCartCouponsToCache(coupons);
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _coupons = coupons;
+        _isLoading = false;
+        _errorMessage = null;
+      });
+    } on FirebaseFunctionsException catch (e) {
+      if (!mounted) {
+        return;
+      }
+
+      if (_coupons.isNotEmpty) {
+        return;
+      }
+
+      setState(() {
+        _isLoading = false;
+        _errorMessage =
+            e.message ??
+                'Unable to load coupons.';
+      });
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      if (_coupons.isNotEmpty) {
+        return;
+      }
 
       setState(() {
         _isLoading = false;

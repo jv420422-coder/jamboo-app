@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
@@ -9,6 +10,9 @@ class CouponService {
   static final CouponService instance =
       CouponService._();
 
+  final FirebaseFirestore _firestore =
+      FirebaseFirestore.instance;
+
   final FirebaseFunctions _functions =
       FirebaseFunctions.instanceFor(
     region: 'us-central1',
@@ -17,27 +21,70 @@ class CouponService {
   Future<List<CouponModel>> getRestaurantCoupons({
     required String restaurantId,
   }) async {
-    return [];
+    try {
+      final snapshot = await _firestore
+          .collection('coupons')
+          .where(
+            'fundedBy',
+            isEqualTo: 'restaurant',
+          )
+          .get();
+
+      final now = DateTime.now();
+
+      return snapshot.docs
+          .map((doc) {
+            return CouponModel.fromMap(
+              doc.data(),
+              restaurantId: restaurantId,
+            );
+          })
+          .where((coupon) {
+            if (!coupon.isActive) {
+              return false;
+            }
+
+            if (coupon.restaurantStatus !=
+                'active') {
+              return false;
+            }
+
+            if (coupon.startDate != null &&
+                now.isBefore(coupon.startDate!)) {
+              return false;
+            }
+
+            if (coupon.endDate != null &&
+                now.isAfter(coupon.endDate!)) {
+              return false;
+            }
+
+            return true;
+          })
+          .toList();
+    } catch (e) {
+      return [];
+    }
   }
 
   Future<bool> validateCoupon({
-  required CouponModel coupon,
-  required double cartAmount,
-  required String userId,
-  required String restaurantId,
-}) async {
-  try {
-    final result = await _validate(
-      couponCode: coupon.code,
-      restaurantId: restaurantId,
-      cartAmount: cartAmount,
-    );
+    required CouponModel coupon,
+    required double cartAmount,
+    required String userId,
+    required String restaurantId,
+  }) async {
+    try {
+      final result = await _validate(
+        couponCode: coupon.code,
+        restaurantId: restaurantId,
+        cartAmount: cartAmount,
+      );
 
-    return result.success;
-  } catch (_) {
-    return false;
+      return result.success;
+    } catch (_) {
+      return false;
+    }
   }
-}
 
   double calculateDiscount({
     required CouponModel coupon,
@@ -111,7 +158,8 @@ class CouponService {
     required String restaurantId,
     required double cartAmount,
   }) async {
-    final user = FirebaseAuth.instance.currentUser;
+    final user =
+        FirebaseAuth.instance.currentUser;
 
     if (user == null) {
       throw Exception(
@@ -125,7 +173,8 @@ class CouponService {
     );
 
     final response = await callable.call({
-      "couponCode": couponCode.trim().toUpperCase(),
+      "couponCode":
+          couponCode.trim().toUpperCase(),
       "restaurantId": restaurantId,
       "subtotal": cartAmount,
     });

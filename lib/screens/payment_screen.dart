@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:razorpay_flutter/razorpay_flutter.dart';
 
 import '../services/cart_service.dart';
 import '../services/order_service.dart';
@@ -8,6 +9,7 @@ import '../models/order_model.dart';
 import 'order_details_screen.dart';
 import '../services/billing_service.dart';
 import 'saved_addresses_screen.dart';
+import '../widgets/order_placing_overlay.dart';
 
 class PaymentScreen extends StatefulWidget {
   final bool couponApplied;
@@ -26,20 +28,63 @@ class PaymentScreen extends StatefulWidget {
       _PaymentScreenState();
 }
 
-class _PaymentScreenState extends State<PaymentScreen> {
-  final CartService _cartService = CartService();
+class _PaymentScreenState
+    extends State<PaymentScreen> {
+  final CartService _cartService =
+      CartService();
 
-  final OrderService _orderService = OrderService();
+  final OrderService _orderService =
+      OrderService();
+
+  late Razorpay _razorpay;
 
   String selectedPayment = "COD";
 
   bool isLoading = false;
 
+  // ------------------------------------------------------------
+  // Razorpay payment state
+  // ------------------------------------------------------------
+
+  String? _pendingPaymentId;
+  String? _pendingRazorpayOrderId;
+  OrderModel? _pendingOrder;
+
+  bool _loadingOverlayShown = false;
+
   @override
   void initState() {
     super.initState();
+
+    _razorpay = Razorpay();
+
+    _razorpay.on(
+      Razorpay.EVENT_PAYMENT_SUCCESS,
+      _handlePaymentSuccess,
+    );
+
+    _razorpay.on(
+      Razorpay.EVENT_PAYMENT_ERROR,
+      _handlePaymentError,
+    );
+
+    _razorpay.on(
+      Razorpay.EVENT_EXTERNAL_WALLET,
+      _handleExternalWallet,
+    );
+
     _loadBusinessRules();
   }
+
+  @override
+  void dispose() {
+    _razorpay.clear();
+    super.dispose();
+  }
+
+  // ------------------------------------------------------------
+  // Business rules
+  // ------------------------------------------------------------
 
   Future<void> _loadBusinessRules() async {
     await BillingService.loadBusinessRules();
@@ -54,6 +99,258 @@ class _PaymentScreenState extends State<PaymentScreen> {
     });
   }
 
+  // ------------------------------------------------------------
+  // Razorpay callbacks
+  // ------------------------------------------------------------
+
+  Future<void> _handlePaymentSuccess(
+    PaymentSuccessResponse response,
+  ) async {
+    final paymentId =
+        response.paymentId;
+
+    final razorpayOrderId =
+        response.orderId;
+
+    final signature =
+        response.signature;
+
+    if (paymentId == null ||
+        paymentId.trim().isEmpty ||
+        razorpayOrderId == null ||
+        razorpayOrderId.trim().isEmpty ||
+        signature == null ||
+        signature.trim().isEmpty) {
+      await _handleOnlinePaymentFailure(
+        "Payment response is incomplete. Please try again.",
+      );
+      return;
+    }
+
+    final pendingPaymentId =
+        _pendingPaymentId;
+
+    final pendingOrder =
+        _pendingOrder;
+
+    final expectedRazorpayOrderId =
+        _pendingRazorpayOrderId;
+
+    if (pendingPaymentId == null ||
+        pendingPaymentId.trim().isEmpty ||
+        pendingOrder == null ||
+        expectedRazorpayOrderId == null ||
+        expectedRazorpayOrderId.trim().isEmpty) {
+      await _handleOnlinePaymentFailure(
+        "Payment session expired. Please try again.",
+      );
+      return;
+    }
+
+    if (razorpayOrderId !=
+        expectedRazorpayOrderId) {
+      await _handleOnlinePaymentFailure(
+        "Payment order mismatch. Please try again.",
+      );
+      return;
+    }
+
+    if (!mounted) return;
+
+    setState(() {
+      isLoading = true;
+    });
+
+    _showLoadingOverlay();
+
+    try {
+      // --------------------------------------------------------
+      // 1. Verify payment on Firebase backend
+      // --------------------------------------------------------
+
+      await _orderService
+          .verifyRazorpayPayment(
+        paymentId:
+            pendingPaymentId,
+        razorpayPaymentId:
+            paymentId,
+        razorpayOrderId:
+            razorpayOrderId,
+        razorpaySignature:
+            signature,
+      );
+
+      // --------------------------------------------------------
+      // 2. Create the actual Jamboo order only AFTER
+      //    successful backend verification.
+      // --------------------------------------------------------
+
+      await _orderService.placeOrder(
+        pendingOrder,
+        couponCode:
+            widget.couponApplied
+                ? widget.couponCode
+                : null,
+        paymentIntentId:
+            pendingPaymentId,
+      );
+
+      // --------------------------------------------------------
+      // 3. Clear cart
+      // --------------------------------------------------------
+
+      try {
+        await _cartService.clearCart();
+      } catch (_) {
+        // Order is already successfully created.
+      }
+
+      _hideLoadingOverlay();
+
+      if (!mounted) return;
+
+      // --------------------------------------------------------
+      // 4. Open order details
+      // --------------------------------------------------------
+
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) =>
+              OrderDetailsScreen(
+            order: pendingOrder,
+          ),
+        ),
+      );
+
+      _clearPendingPayment();
+    } catch (e) {
+      _hideLoadingOverlay();
+
+      if (!mounted) return;
+
+      setState(() {
+        isLoading = false;
+      });
+
+      ScaffoldMessenger.of(context)
+          .showSnackBar(
+        SnackBar(
+          content: Text(
+            _cleanErrorMessage(e),
+          ),
+          duration:
+              const Duration(seconds: 4),
+        ),
+      );
+    }
+  }
+
+  Future<void> _handlePaymentError(
+    PaymentFailureResponse response,
+  ) async {
+    final message =
+        response.message ??
+            "Payment failed. Please try again.";
+
+    await _handleOnlinePaymentFailure(
+      message,
+    );
+  }
+
+  Future<void> _handleExternalWallet(
+    ExternalWalletResponse response,
+  ) async {
+    await _handleOnlinePaymentFailure(
+      "External wallet payment was selected. Please try again.",
+    );
+  }
+
+  Future<void> _handleOnlinePaymentFailure(
+    String message,
+  ) async {
+    _hideLoadingOverlay();
+
+    if (!mounted) return;
+
+    setState(() {
+      isLoading = false;
+    });
+
+    _clearPendingPayment();
+
+    ScaffoldMessenger.of(context)
+        .showSnackBar(
+      SnackBar(
+        content: Text(message),
+        duration:
+            const Duration(seconds: 4),
+      ),
+    );
+  }
+
+  void _clearPendingPayment() {
+    _pendingPaymentId = null;
+    _pendingRazorpayOrderId = null;
+    _pendingOrder = null;
+  }
+
+  // ------------------------------------------------------------
+  // Loading overlay helpers
+  // ------------------------------------------------------------
+
+  void _showLoadingOverlay() {
+    if (!mounted ||
+        _loadingOverlayShown) {
+      return;
+    }
+
+    _loadingOverlayShown = true;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) =>
+          const OrderPlacingOverlay(),
+    );
+  }
+
+  void _hideLoadingOverlay() {
+    if (!mounted ||
+        !_loadingOverlayShown) {
+      return;
+    }
+
+    _loadingOverlayShown = false;
+
+    Navigator.of(context).pop();
+  }
+
+  // ------------------------------------------------------------
+  // Error message helper
+  // ------------------------------------------------------------
+
+  String _cleanErrorMessage(
+    Object error,
+  ) {
+    final message =
+        error.toString();
+
+    if (message.startsWith(
+      "Exception: ",
+    )) {
+      return message.substring(
+        "Exception: ".length,
+      );
+    }
+
+    return message;
+  }
+
+  // ------------------------------------------------------------
+  // Address validation
+  // ------------------------------------------------------------
+
   bool _isValidAddress(
     Map<String, dynamic>? address,
   ) {
@@ -62,28 +359,42 @@ class _PaymentScreenState extends State<PaymentScreen> {
     }
 
     final fullName =
-        (address["fullName"] ?? "").toString().trim();
+        (address["fullName"] ?? "")
+            .toString()
+            .trim();
 
     final phone =
-        (address["phone"] ?? "").toString().trim();
+        (address["phone"] ?? "")
+            .toString()
+            .trim();
 
     final fullAddress =
-        (address["address"] ?? "").toString().trim();
+        (address["address"] ?? "")
+            .toString()
+            .trim();
 
     final city =
-        (address["city"] ?? "").toString().trim();
+        (address["city"] ?? "")
+            .toString()
+            .trim();
 
     final state =
-        (address["state"] ?? "").toString().trim();
+        (address["state"] ?? "")
+            .toString()
+            .trim();
 
     final pincode =
-        (address["pincode"] ?? "").toString().trim();
+        (address["pincode"] ?? "")
+            .toString()
+            .trim();
 
     final latitude =
-        (address["latitude"] as num?)?.toDouble();
+        (address["latitude"] as num?)
+            ?.toDouble();
 
     final longitude =
-        (address["longitude"] as num?)?.toDouble();
+        (address["longitude"] as num?)
+            ?.toDouble();
 
     return fullName.isNotEmpty &&
         phone.isNotEmpty &&
@@ -95,14 +406,20 @@ class _PaymentScreenState extends State<PaymentScreen> {
         longitude != null;
   }
 
-  Future<void> _showAddressRequiredPopup() async {
+  // ------------------------------------------------------------
+  // Address required popup
+  // ------------------------------------------------------------
+
+  Future<void>
+      _showAddressRequiredPopup() async {
     if (!mounted) return;
 
     await showDialog(
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
-          shape: RoundedRectangleBorder(
+          shape:
+              RoundedRectangleBorder(
             borderRadius:
                 BorderRadius.circular(20),
           ),
@@ -110,14 +427,16 @@ class _PaymentScreenState extends State<PaymentScreen> {
             children: [
               Icon(
                 Icons.location_on,
-                color: Colors.deepPurple,
+                color:
+                    Colors.deepPurple,
               ),
               SizedBox(width: 10),
               Expanded(
                 child: Text(
                   "Delivery Address Required",
                   style: TextStyle(
-                    fontWeight: FontWeight.bold,
+                    fontWeight:
+                        FontWeight.bold,
                   ),
                 ),
               ),
@@ -133,9 +452,12 @@ class _PaymentScreenState extends State<PaymentScreen> {
           actions: [
             TextButton(
               onPressed: () {
-                Navigator.pop(dialogContext);
+                Navigator.pop(
+                  dialogContext,
+                );
               },
-              child: const Text("Cancel"),
+              child:
+                  const Text("Cancel"),
             ),
             ElevatedButton(
               style:
@@ -153,7 +475,9 @@ class _PaymentScreenState extends State<PaymentScreen> {
                 ),
               ),
               onPressed: () {
-                Navigator.pop(dialogContext);
+                Navigator.pop(
+                  dialogContext,
+                );
 
                 Navigator.push(
                   context,
@@ -165,9 +489,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
                   ),
                 );
               },
-              child: const Text(
-                "Add Address",
-              ),
+              child:
+                  const Text("Add Address"),
             ),
           ],
         );
@@ -175,7 +498,12 @@ class _PaymentScreenState extends State<PaymentScreen> {
     );
   }
 
-  Future<void> _showServiceabilityPopup(
+  // ------------------------------------------------------------
+  // Serviceability popup
+  // ------------------------------------------------------------
+
+  Future<void>
+      _showServiceabilityPopup(
     double distanceKm,
   ) async {
     if (!mounted) return;
@@ -184,7 +512,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
-          shape: RoundedRectangleBorder(
+          shape:
+              RoundedRectangleBorder(
             borderRadius:
                 BorderRadius.circular(20),
           ),
@@ -192,14 +521,16 @@ class _PaymentScreenState extends State<PaymentScreen> {
             children: [
               Icon(
                 Icons.location_off,
-                color: Colors.redAccent,
+                color:
+                    Colors.redAccent,
               ),
               SizedBox(width: 10),
               Expanded(
                 child: Text(
                   "Delivery Not Available",
                   style: TextStyle(
-                    fontWeight: FontWeight.bold,
+                    fontWeight:
+                        FontWeight.bold,
                   ),
                 ),
               ),
@@ -216,9 +547,12 @@ class _PaymentScreenState extends State<PaymentScreen> {
           actions: [
             TextButton(
               onPressed: () {
-                Navigator.pop(dialogContext);
+                Navigator.pop(
+                  dialogContext,
+                );
               },
-              child: const Text("OK"),
+              child:
+                  const Text("OK"),
             ),
           ],
         );
@@ -226,14 +560,20 @@ class _PaymentScreenState extends State<PaymentScreen> {
     );
   }
 
-  Future<void> _showCodUnavailablePopup() async {
+  // ------------------------------------------------------------
+  // COD unavailable popup
+  // ------------------------------------------------------------
+
+  Future<void>
+      _showCodUnavailablePopup() async {
     if (!mounted) return;
 
     await showDialog(
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
-          shape: RoundedRectangleBorder(
+          shape:
+              RoundedRectangleBorder(
             borderRadius:
                 BorderRadius.circular(20),
           ),
@@ -241,14 +581,16 @@ class _PaymentScreenState extends State<PaymentScreen> {
             children: [
               Icon(
                 Icons.money_off,
-                color: Colors.orange,
+                color:
+                    Colors.orange,
               ),
               SizedBox(width: 10),
               Expanded(
                 child: Text(
                   "Cash on Delivery Unavailable",
                   style: TextStyle(
-                    fontWeight: FontWeight.bold,
+                    fontWeight:
+                        FontWeight.bold,
                   ),
                 ),
               ),
@@ -264,9 +606,12 @@ class _PaymentScreenState extends State<PaymentScreen> {
           actions: [
             TextButton(
               onPressed: () {
-                Navigator.pop(dialogContext);
+                Navigator.pop(
+                  dialogContext,
+                );
               },
-              child: const Text("OK"),
+              child:
+                  const Text("OK"),
             ),
           ],
         );
@@ -274,11 +619,17 @@ class _PaymentScreenState extends State<PaymentScreen> {
     );
   }
 
-  Future<Map<String, dynamic>?> _getSelectedAddress(
+  // ------------------------------------------------------------
+  // Get selected address
+  // ------------------------------------------------------------
+
+  Future<Map<String, dynamic>?>
+      _getSelectedAddress(
     String uid,
   ) async {
     final snapshot =
-        await FirebaseFirestore.instance
+        await FirebaseFirestore
+            .instance
             .collection("users")
             .doc(uid)
             .collection("addresses")
@@ -314,18 +665,25 @@ class _PaymentScreenState extends State<PaymentScreen> {
       "type":
           data["type"] ?? "",
       "latitude":
-          (data["latitude"] ?? 0).toDouble(),
+          (data["latitude"] ?? 0)
+              .toDouble(),
       "longitude":
-          (data["longitude"] ?? 0).toDouble(),
+          (data["longitude"] ?? 0)
+              .toDouble(),
     };
   }
+
+  // ------------------------------------------------------------
+  // Get distance
+  // ------------------------------------------------------------
 
   Future<double?> _getDistanceKm({
     required String restaurantId,
     required Map<String, dynamic> address,
   }) async {
     final restaurantSnapshot =
-        await FirebaseFirestore.instance
+        await FirebaseFirestore
+            .instance
             .collection(
               "restaurant_registrations",
             )
@@ -340,11 +698,13 @@ class _PaymentScreenState extends State<PaymentScreen> {
         restaurantSnapshot.data() ?? {};
 
     final restaurantLatitude =
-        (restaurantData["latitude"] as num?)
+        (restaurantData["latitude"]
+                as num?)
             ?.toDouble();
 
     final restaurantLongitude =
-        (restaurantData["longitude"] as num?)
+        (restaurantData["longitude"]
+                as num?)
             ?.toDouble();
 
     final customerLatitude =
@@ -362,7 +722,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
       return null;
     }
 
-    return BillingService.calculateDistanceKm(
+    return BillingService
+        .calculateDistanceKm(
       restaurantLatitude:
           restaurantLatitude,
       restaurantLongitude:
@@ -374,10 +735,18 @@ class _PaymentScreenState extends State<PaymentScreen> {
     );
   }
 
+  // ------------------------------------------------------------
+  // BUILD
+  // ------------------------------------------------------------
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(
+    BuildContext context,
+  ) {
     final currentUser =
-        FirebaseAuth.instance.currentUser;
+        FirebaseAuth
+            .instance
+            .currentUser;
 
     if (currentUser == null) {
       return const Scaffold(
@@ -389,7 +758,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
       );
     }
 
-    final uid = currentUser.uid;
+    final uid =
+        currentUser.uid;
 
     return Scaffold(
       backgroundColor:
@@ -402,31 +772,38 @@ class _PaymentScreenState extends State<PaymentScreen> {
           "💳 Payment",
           style: TextStyle(
             color: Colors.black,
-            fontWeight: FontWeight.bold,
+            fontWeight:
+                FontWeight.bold,
           ),
         ),
       ),
-      body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance
-            .collection("users")
-            .doc(uid)
-            .collection("addresses")
-            .where(
-              "selectedForCheckout",
-              isEqualTo: true,
-            )
-            .limit(1)
-            .snapshots(),
+      body: StreamBuilder<
+          QuerySnapshot>(
+        stream:
+            FirebaseFirestore
+                .instance
+                .collection("users")
+                .doc(uid)
+                .collection("addresses")
+                .where(
+                  "selectedForCheckout",
+                  isEqualTo: true,
+                )
+                .limit(1)
+                .snapshots(),
         builder:
-            (context, addressSnapshot) {
-          if (!addressSnapshot.hasData) {
+            (context,
+                addressSnapshot) {
+          if (!addressSnapshot
+              .hasData) {
             return const Center(
               child:
                   CircularProgressIndicator(),
             );
           }
 
-          Map<String, dynamic>? address;
+          Map<String, dynamic>?
+              address;
 
           if (addressSnapshot
               .data!
@@ -438,18 +815,28 @@ class _PaymentScreenState extends State<PaymentScreen> {
                         .docs
                         .first
                         .data()
-                    as Map<String, dynamic>;
+                    as Map<String,
+                        dynamic>;
           }
 
-          final bool hasValidAddress =
-              _isValidAddress(address);
+          final bool
+              hasValidAddress =
+              _isValidAddress(
+            address,
+          );
 
-          return StreamBuilder<QuerySnapshot>(
+          return StreamBuilder<
+              QuerySnapshot>(
             stream:
-                _cartService.cartStream(),
+                _cartService
+                    .cartStream(),
             builder:
-                (context, cartSnapshot) {
-              if (!cartSnapshot.hasData) {
+                (
+              context,
+              cartSnapshot,
+            ) {
+              if (!cartSnapshot
+                  .hasData) {
                 return const Center(
                   child:
                       CircularProgressIndicator(),
@@ -457,7 +844,9 @@ class _PaymentScreenState extends State<PaymentScreen> {
               }
 
               final cartDocs =
-                  cartSnapshot.data!.docs;
+                  cartSnapshot
+                      .data!
+                      .docs;
 
               if (cartDocs.isEmpty) {
                 return const Center(
@@ -474,30 +863,37 @@ class _PaymentScreenState extends State<PaymentScreen> {
 
               double subtotal = 0;
 
-              String restaurantId = "";
+              String restaurantId =
+                  "";
 
-              for (final doc in cartDocs) {
+              for (final doc
+                  in cartDocs) {
                 final data =
                     doc.data()
                         as Map<String,
                             dynamic>;
 
                 subtotal +=
-                    ((data["price"] as num)
+                    ((data["price"]
+                                as num)
                             .toDouble()) *
-                        ((data["quantity"] as num)
+                        ((data["quantity"]
+                                as num)
                             .toInt());
 
-                if (restaurantId.isEmpty) {
+                if (restaurantId
+                    .isEmpty) {
                   restaurantId =
-                      (data["restaurantId"] ??
+                      (data[
+                                  "restaurantId"] ??
                               "")
                           .toString();
                 }
               }
 
               if (!hasValidAddress ||
-                  restaurantId.isEmpty) {
+                  restaurantId
+                      .isEmpty) {
                 return _buildPaymentContent(
                   context: context,
                   address: address,
@@ -513,22 +909,28 @@ class _PaymentScreenState extends State<PaymentScreen> {
                 );
               }
 
-              return FutureBuilder<double?>(
-                future: _getDistanceKm(
+              return FutureBuilder<
+                  double?>(
+                future:
+                    _getDistanceKm(
                   restaurantId:
                       restaurantId,
-                  address: address!,
+                  address:
+                      address!,
                 ),
                 builder: (
                   context,
                   distanceSnapshot,
                 ) {
-                  final double? distanceKm =
-                      distanceSnapshot.data;
+                  final double?
+                      distanceKm =
+                      distanceSnapshot
+                          .data;
 
                   if (distanceSnapshot
                           .connectionState ==
-                      ConnectionState.waiting) {
+                      ConnectionState
+                          .waiting) {
                     return const Center(
                       child:
                           CircularProgressIndicator(),
@@ -536,19 +938,22 @@ class _PaymentScreenState extends State<PaymentScreen> {
                   }
 
                   final bill =
-                      distanceKm == null
+                      distanceKm ==
+                              null
                           ? null
                           : BillingService
                               .calculateBill(
                               itemsTotal:
                                   subtotal,
                               couponDiscount:
-                                  widget.couponApplied
+                                  widget
+                                          .couponApplied
                                       ? widget
                                           .couponDiscount
                                       : 0,
                               couponCode:
-                                  widget.couponCode,
+                                  widget
+                                      .couponCode,
                               distanceKm:
                                   distanceKm,
                             );
@@ -562,7 +967,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
                     cartDocs: cartDocs,
                     restaurantId:
                         restaurantId,
-                    distanceKm: distanceKm,
+                    distanceKm:
+                        distanceKm,
                     bill: bill,
                     uid: uid,
                   );
@@ -575,12 +981,17 @@ class _PaymentScreenState extends State<PaymentScreen> {
     );
   }
 
+  // ------------------------------------------------------------
+  // PAYMENT CONTENT
+  // ------------------------------------------------------------
+
   Widget _buildPaymentContent({
     required BuildContext context,
     required Map<String, dynamic>? address,
     required bool hasValidAddress,
     required double subtotal,
-    required List<QueryDocumentSnapshot>
+    required List<
+            QueryDocumentSnapshot>
         cartDocs,
     required String restaurantId,
     required double? distanceKm,
@@ -589,9 +1000,10 @@ class _PaymentScreenState extends State<PaymentScreen> {
   }) {
     final bool isServiceable =
         distanceKm != null &&
-        BillingService.isWithinServiceableRadius(
-          distanceKm,
-        );
+            BillingService
+                .isWithinServiceableRadius(
+              distanceKm,
+            );
 
     return SingleChildScrollView(
       padding:
@@ -600,18 +1012,26 @@ class _PaymentScreenState extends State<PaymentScreen> {
         crossAxisAlignment:
             CrossAxisAlignment.start,
         children: [
+          // ------------------------------------------------------
+          // ADDRESS
+          // ------------------------------------------------------
+
           Container(
             width: double.infinity,
             padding:
                 const EdgeInsets.all(16),
-            decoration: BoxDecoration(
+            decoration:
+                BoxDecoration(
               color: Colors.white,
               borderRadius:
-                  BorderRadius.circular(16),
+                  BorderRadius.circular(
+                16,
+              ),
             ),
             child: Column(
               crossAxisAlignment:
-                  CrossAxisAlignment.start,
+                  CrossAxisAlignment
+                      .start,
               children: [
                 Row(
                   children: [
@@ -637,7 +1057,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(
+                    height: 10),
                 if (hasValidAddress) ...[
                   Text(
                     address!["fullName"]
@@ -683,7 +1104,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
                     "Please add a delivery address to place your order.",
                     style:
                         TextStyle(
-                      color: Colors.grey,
+                      color:
+                          Colors.grey,
                     ),
                   ),
                   const SizedBox(
@@ -701,7 +1123,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
                         ),
                       );
                     },
-                    child: const Text(
+                    child:
+                        const Text(
                       "Add / Select Address",
                     ),
                   ),
@@ -710,23 +1133,32 @@ class _PaymentScreenState extends State<PaymentScreen> {
             ),
           ),
 
-          const SizedBox(height: 20),
+          const SizedBox(
+              height: 20),
+
+          // ------------------------------------------------------
+          // DISTANCE
+          // ------------------------------------------------------
 
           if (distanceKm != null)
             Container(
-              width: double.infinity,
+              width:
+                  double.infinity,
               margin:
                   const EdgeInsets.only(
                 bottom: 20,
               ),
               padding:
                   const EdgeInsets.all(14),
-              decoration: BoxDecoration(
+              decoration:
+                  BoxDecoration(
                 color: isServiceable
                     ? Colors.white
                     : Colors.red.shade50,
                 borderRadius:
-                    BorderRadius.circular(14),
+                    BorderRadius.circular(
+                  14,
+                ),
               ),
               child: Row(
                 children: [
@@ -743,19 +1175,20 @@ class _PaymentScreenState extends State<PaymentScreen> {
                   Expanded(
                     child: Column(
                       crossAxisAlignment:
-                          CrossAxisAlignment.start,
+                          CrossAxisAlignment
+                              .start,
                       children: [
                         Text(
                           "Delivery Distance",
-                          style: TextStyle(
+                          style:
+                              TextStyle(
                             fontWeight:
                                 FontWeight.bold,
-                            color:
-                                isServiceable
-                                    ? Colors
-                                        .black
-                                    : Colors
-                                        .redAccent,
+                            color: isServiceable
+                                ? Colors
+                                    .black
+                                : Colors
+                                    .redAccent,
                           ),
                         ),
                         const SizedBox(
@@ -764,7 +1197,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
                           "${distanceKm.toStringAsFixed(1)} km",
                           style:
                               const TextStyle(
-                            color: Colors.grey,
+                            color:
+                                Colors.grey,
                           ),
                         ),
                       ],
@@ -773,7 +1207,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
                   if (!isServiceable)
                     const Text(
                       "Not serviceable",
-                      style: TextStyle(
+                      style:
+                          TextStyle(
                         color:
                             Colors.redAccent,
                         fontWeight:
@@ -784,6 +1219,10 @@ class _PaymentScreenState extends State<PaymentScreen> {
               ),
             ),
 
+          // ------------------------------------------------------
+          // PAYMENT METHOD
+          // ------------------------------------------------------
+
           const Text(
             "Payment Method",
             style: TextStyle(
@@ -793,14 +1232,16 @@ class _PaymentScreenState extends State<PaymentScreen> {
             ),
           ),
 
-          const SizedBox(height: 10),
+          const SizedBox(
+              height: 10),
 
           paymentTile(
             "Cash on Delivery",
             "COD",
             Icons.money,
             enabled:
-                BillingService.codEnabled,
+                BillingService
+                    .codEnabled,
             unavailableMessage:
                 "Cash on Delivery is not currently available",
           ),
@@ -821,18 +1262,28 @@ class _PaymentScreenState extends State<PaymentScreen> {
             "Wallet",
             "WALLET",
             Icons.account_balance_wallet,
+            enabled: false,
+            unavailableMessage:
+                "Wallet is coming soon",
           ),
 
-          const SizedBox(height: 20),
+          const SizedBox(
+              height: 20),
 
+          // ------------------------------------------------------
+          // BILL
+          // ------------------------------------------------------
           if (bill != null)
             Container(
               padding:
                   const EdgeInsets.all(16),
-              decoration: BoxDecoration(
+              decoration:
+                  BoxDecoration(
                 color: Colors.white,
                 borderRadius:
-                    BorderRadius.circular(16),
+                    BorderRadius.circular(
+                  16,
+                ),
               ),
               child: Column(
                 children: [
@@ -844,7 +1295,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
                     "Delivery Fee",
                     bill.deliveryFee,
                   ),
-                  if (bill.longDistanceCharge >
+                  if (bill
+                          .longDistanceCharge >
                       0)
                     summaryRow(
                       "Long Distance Charge",
@@ -871,331 +1323,61 @@ class _PaymentScreenState extends State<PaymentScreen> {
           if (bill == null &&
               hasValidAddress)
             Container(
-              width: double.infinity,
+              width:
+                  double.infinity,
               padding:
                   const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: Colors.red.shade50,
+              decoration:
+                  BoxDecoration(
+                color:
+                    Colors.red.shade50,
                 borderRadius:
-                    BorderRadius.circular(14),
+                    BorderRadius.circular(
+                  14,
+                ),
               ),
               child: const Text(
                 "Unable to calculate the delivery charge. Please try again.",
                 style: TextStyle(
-                  color: Colors.redAccent,
+                  color:
+                      Colors.redAccent,
                   fontWeight:
                       FontWeight.w600,
                 ),
               ),
             ),
 
-          const SizedBox(height: 30),
+          const SizedBox(
+              height: 30),
+
+          // ------------------------------------------------------
+          // PLACE ORDER / PAY BUTTON
+          // ------------------------------------------------------
 
           SizedBox(
-            width: double.infinity,
+            width:
+                double.infinity,
             height: 55,
-            child: ElevatedButton(
+            child:
+                ElevatedButton(
               onPressed:
                   isLoading ||
                           !hasValidAddress ||
                           bill == null ||
-                          distanceKm == null ||
+                          distanceKm ==
+                              null ||
                           !isServiceable
                       ? null
                       : () async {
-                          if (selectedPayment ==
-                                  "COD" &&
-                              !BillingService
-                                  .codEnabled) {
-                            await _showCodUnavailablePopup();
-                            return;
-                          }
-
-                          setState(() {
-                            isLoading = true;
-                          });
-
-                          try {
-                            final latestAddress =
-                                await _getSelectedAddress(
-                              uid,
-                            );
-
-                            if (!_isValidAddress(
-                              latestAddress,
-                            )) {
-                              await _showAddressRequiredPopup();
-                              return;
-                            }
-
-                            final latestDistance =
-                                await _getDistanceKm(
-                              restaurantId:
-                                  restaurantId,
-                              address:
-                                  latestAddress!,
-                            );
-
-                            if (latestDistance ==
-                                null) {
-                              throw Exception(
-                                "Unable to calculate delivery distance.",
-                              );
-                            }
-
-                            if (!BillingService
-                                .isWithinServiceableRadius(
-                              latestDistance,
-                            )) {
-                              await _showServiceabilityPopup(
-                                latestDistance,
-                              );
-                              return;
-                            }
-
-                            if (selectedPayment ==
-                                    "COD" &&
-                                !BillingService
-                                    .codEnabled) {
-                              await _showCodUnavailablePopup();
-                              return;
-                            }
-
-                            final finalBill =
-                                BillingService
-                                    .calculateBill(
-                              itemsTotal:
-                                  subtotal,
-                              couponDiscount:
-                                  widget.couponApplied
-                                      ? widget
-                                          .couponDiscount
-                                      : 0,
-                              couponCode:
-                                  widget.couponCode,
-                              distanceKm:
-                                  latestDistance,
-                            );
-
-                            final orderId =
-                                FirebaseFirestore
-                                    .instance
-                                    .collection(
-                                      "orders",
-                                    )
-                                    .doc()
-                                    .id;
-
-                            final orderNumber =
-                                "JMB${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}";
-
-                            final List<
-                                    Map<String,
-                                        dynamic>>
-                                items = [];
-
-                            String finalRestaurantId =
-                                "";
-
-                            String finalRestaurantName =
-                                "";
-
-                            for (final doc
-                                in cartDocs) {
-                              final data =
-                                  doc.data()
-                                      as Map<
-                                          String,
-                                          dynamic>;
-
-                              items.add(data);
-
-                              finalRestaurantId =
-                                  data[
-                                          "restaurantId"] ??
-                                      "";
-
-                              finalRestaurantName =
-                                  data[
-                                          "restaurantName"] ??
-                                      "";
-                            }
-
-                            final userDoc =
-                                await FirebaseFirestore
-                                    .instance
-                                    .collection(
-                                      "users",
-                                    )
-                                    .doc(uid)
-                                    .get();
-
-                            final userData =
-                                userDoc.data() ??
-                                    {};
-
-                            final restaurantDoc =
-                                await FirebaseFirestore
-                                    .instance
-                                    .collection(
-                                      "restaurant_registrations",
-                                    )
-                                    .doc(
-                                      finalRestaurantId,
-                                    )
-                                    .get();
-
-                            final restaurantData =
-                                restaurantDoc
-                                        .data() ??
-                                    {};
-
-                            final restaurantAddress =
-                                restaurantData[
-                                        "address"] ??
-                                    "";
-
-                            final restaurantLatitude =
-                                (restaurantData[
-                                            "latitude"] ??
-                                        0)
-                                    .toDouble();
-
-                            final restaurantLongitude =
-                                (restaurantData[
-                                            "longitude"] ??
-                                        0)
-                                    .toDouble();
-
-                            final customerLatitude =
-                                (latestAddress[
-                                            "latitude"] ??
-                                        0)
-                                    .toDouble();
-
-                            final customerLongitude =
-                                (latestAddress[
-                                            "longitude"] ??
-                                        0)
-                                    .toDouble();
-
-                            final order =
-                                OrderModel(
-                              orderId: orderId,
-                              orderNumber:
-                                  orderNumber,
-                              userId: uid,
-                              customerName:
-                                  userData[
-                                          "fullName"] ??
-                                      "",
-                              customerPhone:
-                                  userData[
-                                          "phone"] ??
-                                      "",
-                              deliveryPartnerId:
-                                  "",
-                              deliveryPartnerName:
-                                  "",
-                              deliveryPartnerPhone:
-                                  "",
-                              vehicleNumber:
-                                  "",
-                              restaurantId:
-                                  finalRestaurantId,
-                              restaurantName:
-                                  finalRestaurantName,
-                              restaurantAddress:
-                                  restaurantAddress,
-                              restaurantLatitude:
-                                  restaurantLatitude,
-                              restaurantLongitude:
-                                  restaurantLongitude,
-                              items: items,
-                              deliveryAddress:
-                                  latestAddress,
-                              customerLatitude:
-                                  customerLatitude,
-                              customerLongitude:
-                                  customerLongitude,
-                              paymentMethod:
-                                  selectedPayment,
-                              paymentStatus:
-                                  "Pending",
-                              orderStatus:
-                                  "Pending",
-                              subtotal:
-                                  subtotal,
-                              deliveryFee:
-                                  finalBill
-                                      .deliveryFee,
-                              longDistanceCharge:
-                                  finalBill
-                                      .longDistanceCharge,
-                              platformFee:
-                                  finalBill
-                                      .platformFee,
-                              discount:
-                                  finalBill
-                                      .couponDiscount,
-                              totalAmount:
-                                  finalBill
-                                      .grandTotal,
-                              createdAt:
-                                  DateTime.now(),
-                            );
-
-                            await _orderService
-                                .placeOrder(
-                              order,
-                              couponCode:
-                                  widget
-                                          .couponApplied
-                                      ? widget
-                                          .couponCode
-                                      : null,
-                            );
-
-                            await _cartService
-                                .clearCart();
-
-                            if (!mounted) {
-                              return;
-                            }
-
-                            Navigator
-                                .pushReplacement(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) =>
-                                    OrderDetailsScreen(
-                                  order: order,
-                                ),
-                              ),
-                            );
-                          } catch (e) {
-                            if (!mounted) {
-                              return;
-                            }
-
-                            ScaffoldMessenger
-                                .of(context)
-                                .showSnackBar(
-                              SnackBar(
-                                content:
-                                    Text(
-                                  e.toString(),
-                                ),
-                              ),
-                            );
-                          } finally {
-                            if (mounted) {
-                              setState(() {
-                                isLoading =
-                                    false;
-                              });
-                            }
-                          }
+                          await _handlePlaceOrder(
+                            uid: uid,
+                            subtotal:
+                                subtotal,
+                            cartDocs:
+                                cartDocs,
+                            restaurantId:
+                                restaurantId,
+                          );
                         },
               style:
                   ElevatedButton.styleFrom(
@@ -1208,11 +1390,16 @@ class _PaymentScreenState extends State<PaymentScreen> {
               ),
               child: isLoading
                   ? const CircularProgressIndicator(
-                      color: Colors.white,
+                      color:
+                          Colors.white,
                     )
-                  : const Text(
-                      "Place Order",
-                      style: TextStyle(
+                  : Text(
+                      selectedPayment ==
+                              "COD"
+                          ? "Place Order"
+                          : "Pay & Place Order",
+                      style:
+                          const TextStyle(
                         fontSize: 16,
                         fontWeight:
                             FontWeight.bold,
@@ -1225,6 +1412,596 @@ class _PaymentScreenState extends State<PaymentScreen> {
     );
   }
 
+  // ------------------------------------------------------------
+  // MAIN PLACE ORDER HANDLER
+  // ------------------------------------------------------------
+
+  Future<void> _handlePlaceOrder({
+    required String uid,
+    required double subtotal,
+    required List<
+            QueryDocumentSnapshot>
+        cartDocs,
+    required String restaurantId,
+  }) async {
+    if (selectedPayment ==
+            "COD" &&
+        !BillingService
+            .codEnabled) {
+      await _showCodUnavailablePopup();
+      return;
+    }
+
+    if (selectedPayment ==
+        "WALLET") {
+      return;
+    }
+
+    if (!mounted) return;
+
+    setState(() {
+      isLoading = true;
+    });
+
+    _showLoadingOverlay();
+
+    try {
+      // --------------------------------------------------------
+      // 1. Get latest selected address
+      // --------------------------------------------------------
+
+      final latestAddress =
+          await _getSelectedAddress(
+        uid,
+      );
+
+      if (!_isValidAddress(
+        latestAddress,
+      )) {
+        _hideLoadingOverlay();
+
+        await _showAddressRequiredPopup();
+
+        return;
+      }
+
+      // --------------------------------------------------------
+      // 2. Recalculate latest distance
+      // --------------------------------------------------------
+
+      final latestDistance =
+          await _getDistanceKm(
+        restaurantId:
+            restaurantId,
+        address:
+            latestAddress!,
+      );
+
+      if (latestDistance == null) {
+        throw Exception(
+          "Unable to calculate delivery distance.",
+        );
+      }
+
+      if (!BillingService
+          .isWithinServiceableRadius(
+        latestDistance,
+      )) {
+        _hideLoadingOverlay();
+
+        await _showServiceabilityPopup(
+          latestDistance,
+        );
+
+        return;
+      }
+
+      // --------------------------------------------------------
+      // 3. Calculate local bill for OrderModel/display
+      // --------------------------------------------------------
+
+      final finalBill =
+          BillingService.calculateBill(
+        itemsTotal:
+            subtotal,
+        couponDiscount:
+            widget.couponApplied
+                ? widget.couponDiscount
+                : 0,
+        couponCode:
+            widget.couponCode,
+        distanceKm:
+            latestDistance,
+      );
+
+      // --------------------------------------------------------
+      // 4. Build order ID and order number
+      // --------------------------------------------------------
+
+      final orderId =
+          FirebaseFirestore
+              .instance
+              .collection("orders")
+              .doc()
+              .id;
+
+      final orderNumber =
+          "JMB${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}";
+
+      // --------------------------------------------------------
+      // 5. Prepare cart items
+      // --------------------------------------------------------
+
+      final List<
+              Map<String, dynamic>>
+          items = [];
+
+      String finalRestaurantId =
+          "";
+
+      String finalRestaurantName =
+          "";
+
+      for (final doc
+          in cartDocs) {
+        final data =
+            doc.data()
+                as Map<String,
+                    dynamic>;
+
+        items.add(
+          Map<String, dynamic>.from(
+            data,
+          ),
+        );
+
+        finalRestaurantId =
+            (data["restaurantId"] ??
+                    "")
+                .toString();
+
+        finalRestaurantName =
+            (data["restaurantName"] ??
+                    "")
+                .toString();
+      }
+
+      if (finalRestaurantId
+          .isEmpty) {
+        throw Exception(
+          "Restaurant information is missing.",
+        );
+      }
+
+      // --------------------------------------------------------
+      // 6. Get customer
+      // --------------------------------------------------------
+
+      final userDoc =
+          await FirebaseFirestore
+              .instance
+              .collection("users")
+              .doc(uid)
+              .get();
+
+      final userData =
+          userDoc.data() ?? {};
+
+      // --------------------------------------------------------
+      // 7. Get restaurant
+      // --------------------------------------------------------
+
+      final restaurantDoc =
+          await FirebaseFirestore
+              .instance
+              .collection(
+                "restaurant_registrations",
+              )
+              .doc(
+                finalRestaurantId,
+              )
+              .get();
+
+      if (!restaurantDoc.exists) {
+        throw Exception(
+          "Restaurant not found.",
+        );
+      }
+
+      final restaurantData =
+          restaurantDoc.data() ??
+              {};
+
+      final restaurantAddress =
+          restaurantData[
+                  "address"] ??
+              "";
+
+      final restaurantLatitude =
+          (restaurantData[
+                      "latitude"] ??
+                  0)
+              .toDouble();
+
+      final restaurantLongitude =
+          (restaurantData[
+                      "longitude"] ??
+                  0)
+              .toDouble();
+
+      final customerLatitude =
+          (latestAddress[
+                      "latitude"] ??
+                  0)
+              .toDouble();
+
+      final customerLongitude =
+          (latestAddress[
+                      "longitude"] ??
+                  0)
+              .toDouble();
+
+      // --------------------------------------------------------
+      // 8. Create OrderModel
+      // --------------------------------------------------------
+
+      final order =
+          OrderModel(
+        orderId:
+            orderId,
+        orderNumber:
+            orderNumber,
+
+        userId:
+            uid,
+
+        customerName:
+            userData[
+                    "fullName"] ??
+                "",
+
+        customerPhone:
+            userData[
+                    "phone"] ??
+                "",
+
+        deliveryPartnerId:
+            "",
+
+        deliveryPartnerName:
+            "",
+
+        deliveryPartnerPhone:
+            "",
+
+        vehicleNumber:
+            "",
+
+        restaurantId:
+            finalRestaurantId,
+
+        restaurantName:
+            finalRestaurantName,
+
+        restaurantAddress:
+            restaurantAddress,
+
+        restaurantLatitude:
+            restaurantLatitude,
+
+        restaurantLongitude:
+            restaurantLongitude,
+
+        items:
+            items,
+
+        deliveryAddress:
+            latestAddress,
+
+        customerLatitude:
+            customerLatitude,
+
+        customerLongitude:
+            customerLongitude,
+
+        paymentMethod:
+            selectedPayment,
+
+        paymentStatus:
+            selectedPayment ==
+                    "COD"
+                ? "Pending"
+                : "Pending",
+
+        orderStatus:
+            "Pending",
+
+        subtotal:
+            subtotal,
+
+        deliveryFee:
+            finalBill.deliveryFee,
+
+        longDistanceCharge:
+            finalBill
+                .longDistanceCharge,
+
+        platformFee:
+            finalBill
+                .platformFee,
+
+        discount:
+            finalBill
+                .couponDiscount,
+
+        totalAmount:
+            finalBill.grandTotal,
+
+        createdAt:
+            DateTime.now(),
+      );
+
+      // --------------------------------------------------------
+      // COD FLOW
+      // --------------------------------------------------------
+
+      if (selectedPayment ==
+          "COD") {
+        await _orderService
+            .placeOrder(
+          order,
+          couponCode:
+              widget.couponApplied
+                  ? widget
+                      .couponCode
+                  : null,
+        );
+
+        _hideLoadingOverlay();
+
+        if (!mounted) return;
+
+        try {
+          await _cartService
+              .clearCart();
+        } catch (_) {
+          // Order is already placed.
+        }
+
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) =>
+                OrderDetailsScreen(
+              order: order,
+            ),
+          ),
+        );
+
+        return;
+      }
+
+      // --------------------------------------------------------
+      // ONLINE PAYMENT FLOW
+      // --------------------------------------------------------
+      // First create a server-side payment intent.
+      final paymentIntent =
+          await _orderService
+              .createPaymentIntent(
+        orderId:
+            orderId,
+        orderNumber:
+            orderNumber,
+        restaurantId:
+            finalRestaurantId,
+        paymentMethod:
+            selectedPayment,
+        items:
+            items,
+        deliveryAddress:
+            latestAddress,
+        customerLatitude:
+            customerLatitude,
+        customerLongitude:
+            customerLongitude,
+        customerName:
+            userData["fullName"] ??
+                "",
+        customerPhone:
+            userData["phone"] ??
+                "",
+        couponCode:
+            widget.couponApplied
+                ? widget.couponCode
+                : null,
+        customerNote:
+            order.customerNote,
+      );
+
+      final paymentId =
+          (paymentIntent[
+                      "paymentId"] ??
+                  "")
+              .toString();
+
+      if (paymentId.isEmpty) {
+        throw Exception(
+          "Unable to create payment request.",
+        );
+      }
+
+      final serverAmount =
+    (paymentIntent["amountInPaise"] as num?)?.toInt() ?? 0;
+
+      if (serverAmount <= 0) {
+        throw Exception(
+          "Invalid payment amount received from server.",
+        );
+      }
+
+      // --------------------------------------------------------
+      // Create Razorpay order from server-side payment intent.
+      // --------------------------------------------------------
+
+      final razorpayOrder =
+          await _orderService
+              .createRazorpayOrder(
+        paymentId:
+            paymentId,
+      );
+
+      final razorpayOrderId =
+          (razorpayOrder[
+                      "orderId"] ??
+                  "")
+              .toString();
+
+      final razorpayKeyId =
+          (razorpayOrder[
+                      "keyId"] ??
+                  "")
+              .toString();
+
+      final razorpayAmount =
+    (razorpayOrder["amount"] as num?)?.toInt() ?? 0;
+
+      if (razorpayOrderId
+              .isEmpty ||
+          razorpayKeyId
+              .isEmpty ||
+          razorpayAmount <= 0) {
+        throw Exception(
+          "Unable to create Razorpay order.",
+        );
+      }
+
+      if (razorpayAmount !=
+          serverAmount) {
+        throw Exception(
+          "Payment amount mismatch. Please try again.",
+        );
+      }
+
+      // --------------------------------------------------------
+      // Save pending payment state.
+      // --------------------------------------------------------
+
+      _pendingPaymentId =
+          paymentId;
+
+      _pendingRazorpayOrderId =
+          razorpayOrderId;
+
+      _pendingOrder =
+          order;
+
+      // Remove our loading overlay before Razorpay opens.
+      _hideLoadingOverlay();
+
+      if (!mounted) return;
+
+      // --------------------------------------------------------
+      // Open Razorpay Checkout
+      // --------------------------------------------------------
+
+      final currentUser =
+          FirebaseAuth
+              .instance
+              .currentUser;
+
+      final email =
+          currentUser?.email;
+
+      final phone =
+          userData["phone"]
+                  ?.toString() ??
+              "";
+
+      final name =
+          userData["fullName"]
+                  ?.toString() ??
+              "Jamboo Customer";
+
+      final Map<String, dynamic>
+          options = {
+        "key":
+            razorpayKeyId,
+
+        "amount":
+            razorpayAmount,
+
+        "currency":
+            "INR",
+
+        "order_id":
+            razorpayOrderId,
+
+        "name":
+            "Jamboo",
+
+        "description":
+            "Food order payment",
+
+        "prefill": {
+          "name":
+              name,
+          "contact":
+              phone,
+          if (email != null &&
+              email
+                  .trim()
+                  .isNotEmpty)
+            "email":
+                email.trim(),
+        },
+
+        "theme": {
+          "color":
+              "#7E57C2",
+        },
+      };
+
+      // --------------------------------------------------------
+      // Important:
+      //
+      // We intentionally do not trust the client-side success
+      // callback as proof of payment.
+      //
+      // _handlePaymentSuccess() sends the Razorpay payment ID,
+      // order ID and signature to Firebase for verification.
+      // --------------------------------------------------------
+
+      _razorpay.open(
+        options,
+      );
+    } catch (e) {
+      _hideLoadingOverlay();
+
+      _clearPendingPayment();
+
+      if (!mounted) return;
+
+      setState(() {
+        isLoading = false;
+      });
+
+      ScaffoldMessenger.of(context)
+          .showSnackBar(
+        SnackBar(
+          content: Text(
+            _cleanErrorMessage(e),
+          ),
+          duration:
+              const Duration(seconds: 4),
+        ),
+      );
+    }
+  }
+
+  // ------------------------------------------------------------
+  // PAYMENT TILE
+  // ------------------------------------------------------------
+
   Widget paymentTile(
     String title,
     String value,
@@ -1233,46 +2010,67 @@ class _PaymentScreenState extends State<PaymentScreen> {
     String? unavailableMessage,
   }) {
     final bool isSelected =
-        selectedPayment == value;
+        selectedPayment ==
+            value;
 
     return Container(
       margin:
           const EdgeInsets.only(
         bottom: 12,
       ),
-      decoration: BoxDecoration(
+      decoration:
+          BoxDecoration(
         color: enabled
             ? Colors.white
             : Colors.grey.shade100,
         borderRadius:
-            BorderRadius.circular(16),
-        border: Border.all(
-          color: isSelected &&
-                  enabled
-              ? Colors.deepPurple
-              : Colors.transparent,
+            BorderRadius.circular(
+          16,
+        ),
+        border:
+            Border.all(
+          color:
+              isSelected && enabled
+                  ? Colors.deepPurple
+                  : Colors.transparent,
           width: 1.5,
         ),
       ),
-      child: IgnorePointer(
-        ignoring: !enabled,
-        child: RadioListTile<String>(
-          value: value,
-          groupValue: selectedPayment,
-          onChanged: enabled
-              ? (newValue) {
-                  setState(() {
-                    selectedPayment =
-                        newValue!;
-                  });
-                }
-              : null,
-          title: Text(
+      child:
+          IgnorePointer(
+        ignoring:
+            !enabled,
+        child:
+            RadioListTile<
+                String>(
+          value:
+              value,
+          groupValue:
+              selectedPayment,
+          onChanged:
+              enabled
+                  ? (newValue) {
+                      if (newValue ==
+                          null) {
+                        return;
+                      }
+
+                      setState(() {
+                        selectedPayment =
+                            newValue;
+                      });
+                    }
+                  : null,
+          title:
+              Text(
             title,
-            style: TextStyle(
+            style:
+                TextStyle(
               color: enabled
                   ? Colors.black
-                  : Colors.grey.shade600,
+                  : Colors
+                      .grey
+                      .shade600,
               fontWeight:
                   FontWeight.w600,
             ),
@@ -1283,31 +2081,40 @@ class _PaymentScreenState extends State<PaymentScreen> {
                       !enabled
                   ? Padding(
                       padding:
-                          const EdgeInsets.only(
+                          const EdgeInsets
+                              .only(
                         top: 4,
                       ),
-                      child: Text(
+                      child:
+                          Text(
                         unavailableMessage,
                         style:
                             TextStyle(
                           color: Colors
                               .grey
                               .shade600,
-                          fontSize: 12,
+                          fontSize:
+                              12,
                         ),
                       ),
                     )
                   : null,
-          secondary: Icon(
+          secondary:
+              Icon(
             icon,
             color: enabled
-                ? Colors.deepPurple
+                ? Colors
+                    .deepPurple
                 : Colors.grey,
           ),
         ),
       ),
     );
   }
+
+  // ------------------------------------------------------------
+  // SUMMARY ROW
+  // ------------------------------------------------------------
 
   Widget summaryRow(
     String title,
@@ -1316,7 +2123,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
   }) {
     return Padding(
       padding:
-          const EdgeInsets.symmetric(
+          const EdgeInsets
+              .symmetric(
         vertical: 6,
       ),
       child: Row(
@@ -1324,25 +2132,35 @@ class _PaymentScreenState extends State<PaymentScreen> {
           Expanded(
             child: Text(
               title,
-              style: TextStyle(
+              style:
+                  TextStyle(
                 fontWeight:
                     isBold
-                        ? FontWeight.bold
-                        : FontWeight.normal,
+                        ? FontWeight
+                            .bold
+                        : FontWeight
+                            .normal,
                 fontSize:
-                    isBold ? 16 : 14,
+                    isBold
+                        ? 16
+                        : 14,
               ),
             ),
           ),
           Text(
             "₹${amount.toStringAsFixed(2)}",
-            style: TextStyle(
+            style:
+                TextStyle(
               fontWeight:
                   isBold
-                      ? FontWeight.bold
-                      : FontWeight.normal,
+                      ? FontWeight
+                          .bold
+                      : FontWeight
+                          .normal,
               fontSize:
-                  isBold ? 16 : 14,
+                  isBold
+                      ? 16
+                      : 14,
             ),
           ),
         ],
