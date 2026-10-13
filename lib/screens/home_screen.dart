@@ -49,6 +49,7 @@ _serviceabilityService =
 RestaurantServiceabilityService();
 
 bool showAIPopup = false;
+bool _isRefreshing = false;
 // Customer ki selected location ke coordinates.
 double? _customerLatitude;
 double? _customerLongitude;
@@ -181,40 +182,8 @@ setState(() {
   },  
 );  
 
-_recommendedMenuSubscription =  
-    FirebaseFirestore.instance  
-        .collection('menu_items')  
-        .where(  
-          'isRecommended',  
-          isEqualTo: true,  
-        )  
-        .snapshots()  
-        .listen(  
-  (snapshot) {  
-    if (!mounted) return;  
-
-    setState(() {  
-      _recommendedMenuDocs =  
-          snapshot.docs;  
-
-      _recommendedMenuLoaded =  
-          true;  
-    });  
-  },  
-  onError: (error) {  
-    debugPrint(  
-      'CUSTOMER RECOMMENDED MENU STREAM ERROR: $error',  
-    );  
-
-    if (!mounted) return;  
-
-    setState(() {  
-      _recommendedMenuDocs = [];  
-      _recommendedMenuLoaded = true;  
-    });  
-  },  
-);  
-
+_recommendedMenuDocs = [];
+_recommendedMenuLoaded = true;
 _loadPromotions();
 
 }
@@ -289,7 +258,9 @@ if (shouldShow != showAIPopup &&
 // LOCATION
 // ---------------------------------------------------------------------------
 
-Future<void> _updateCurrentLocation() async {
+Future<void> _updateCurrentLocation({
+  bool showLoading = true,
+}) async {
   final user = FirebaseAuth.instance.currentUser;
 
   if (user == null) {
@@ -304,11 +275,11 @@ Future<void> _updateCurrentLocation() async {
     return;
   }
 
-  if (mounted) {
-    setState(() {
-      _locationChecking = true;
-    });
-  }
+  if (mounted && showLoading) {
+  setState(() {
+    _locationChecking = true;
+  });
+}
 
   try {
     final permissionReady =
@@ -403,6 +374,33 @@ Future<void> _updateCurrentLocation() async {
       _locationUnavailable = true;
       _serviceabilityLoading = false;
     });
+  }
+}
+// ---------------------------------------------------------------------------
+// HOME SCREEN REFRESH
+// ---------------------------------------------------------------------------
+
+Future<void> _refreshHomeScreen() async {
+  if (_isRefreshing || !mounted) return;
+
+  setState(() {
+    _isRefreshing = true;
+  });
+
+  try {
+    // Current location refresh karo aur serviceability dobara check karo.
+    await _updateCurrentLocation(showLoading: false);
+
+    // Recommended promotions ko dobara load karo.
+    await _loadPromotions();
+  } catch (e) {
+    debugPrint('HOME SCREEN REFRESH ERROR: $e');
+  } finally {
+    if (mounted) {
+      setState(() {
+        _isRefreshing = false;
+      });
+    }
   }
 }
 
@@ -1787,11 +1785,14 @@ body: _locationChecking
             : Stack(
 children: [
 SafeArea(
-child:
-SingleChildScrollView(
-controller:
-_scrollController,
-child: Column(
+child: RefreshIndicator(
+  onRefresh: _refreshHomeScreen,
+  color: const Color(0xFF7E57C2),
+  backgroundColor: Colors.white,
+  child: SingleChildScrollView(
+    controller: _scrollController,
+    physics: const AlwaysScrollableScrollPhysics(),
+    child: Column(
 crossAxisAlignment:
 CrossAxisAlignment
 .start,
@@ -1983,7 +1984,8 @@ const SizedBox(
             ],  
           ),  
         ),  
-      ),  
+      ),
+),  
 
       // -------------------------------------------------------------------  
       // JAMBOO AI FLOATING BUTTON  
