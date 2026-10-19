@@ -42,12 +42,15 @@ Future<void> main() async {
 }
 
 class JambooApp extends StatelessWidget {
+  static final GlobalKey<NavigatorState> navigatorKey =
+    GlobalKey<NavigatorState>();
   const JambooApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      debugShowCheckedModeBanner: false,
+  navigatorKey: JambooApp.navigatorKey,
+  debugShowCheckedModeBanner: false,
       title: "Jamboo",
 
       builder: (context, child) {

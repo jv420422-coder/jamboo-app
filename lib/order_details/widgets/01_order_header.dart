@@ -203,23 +203,79 @@ class _OrderHeaderState
     }
 
     if (status == "cancelled" ||
-        status == "rejected") {
-      _etaTitle = "Order Status";
+    status == "rejected") {
+  final paymentMethod =
+      (widget.orderData["paymentMethod"] ?? "")
+          .toString()
+          .trim()
+          .toLowerCase();
 
-      _etaMessage =
-          "This order is no longer active.";
+  final paymentStatus =
+      (widget.orderData["paymentStatus"] ?? "")
+          .toString()
+          .trim()
+          .toLowerCase();
 
-      _etaCardTitle =
-          "Order closed";
+  final refundStatus =
+      (widget.orderData["refundStatus"] ?? "")
+          .toString()
+          .trim()
+          .toLowerCase();
 
-      _etaCardMessage =
-          "No further delivery updates are available.";
+  final isOnlinePaid =
+      (paymentMethod == "upi" ||
+          paymentMethod == "card") &&
+      paymentStatus == "paid";
 
-      _etaCardIcon =
-          Icons.info_outline;
+  _etaTitle = "Order Status";
 
-      return;
-    }
+  _etaCardIcon = Icons.info_outline;
+
+  if (isOnlinePaid &&
+      (refundStatus == "initiated" ||
+          refundStatus == "processed" ||
+          refundStatus == "refunded")) {
+    final amount =
+        widget.orderData["totalAmount"];
+
+    final amountText = amount is num
+        ? amount.toStringAsFixed(2)
+        : "0.00";
+
+    _etaMessage =
+        "Your order has been cancelled.";
+
+    _etaCardTitle = "Refund Initiated";
+
+    _etaCardMessage =
+        "Your refund of ₹$amountText has been initiated. "
+        "It should reach your bank account within 5–7 working days.";
+
+    _etaCardIcon = Icons.account_balance;
+
+  } else if (isOnlinePaid) {
+    _etaMessage =
+        "Your order has been cancelled.";
+
+    _etaCardTitle = "Refund Update";
+
+    _etaCardMessage =
+        "Your online payment was successful. "
+        "Your refund is being checked. "
+        "Please contact Jamboo support for an update.";
+
+  } else {
+    _etaMessage =
+        "This order has been cancelled.";
+
+    _etaCardTitle = "Order closed";
+
+    _etaCardMessage =
+        "No further delivery updates are available.";
+  }
+
+  return;
+}
   }
 
   void _setupPreparationEta() {
