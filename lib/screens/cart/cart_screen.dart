@@ -27,6 +27,13 @@ class CartScreen extends StatefulWidget {
 
 class _CartScreenState extends State<CartScreen> {
   final CartService cartService = CartService();
+  Stream<DocumentSnapshot<Map<String, dynamic>>>
+    _restaurantStatusStream(String restaurantId) {
+  return FirebaseFirestore.instance
+      .collection('restaurant_registrations')
+      .doc(restaurantId)
+      .snapshots();
+}
 
   bool couponApplied = false;
   String? appliedCoupon;
@@ -1173,6 +1180,74 @@ class _CartScreenState extends State<CartScreen> {
                                       ],
                                     ),
                                   ),
+                                  if (restaurantId != null)
+  StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+    stream: _restaurantStatusStream(restaurantId),
+    builder: (context, restaurantSnapshot) {
+      if (!restaurantSnapshot.hasData) {
+        return const SizedBox.shrink();
+      }
+
+      final restaurantData =
+          restaurantSnapshot.data!.data();
+
+      final bool isRestaurantOpen =
+          restaurantData != null &&
+          restaurantData['isOpen'] == true;
+
+      if (isRestaurantOpen) {
+        return const SizedBox.shrink();
+      }
+
+      return Container(
+        width: double.infinity,
+        margin: const EdgeInsets.only(bottom: 16),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.red.shade50,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: Colors.red.shade200,
+          ),
+        ),
+        child: const Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              Icons.store_outlined,
+              color: Colors.redAccent,
+              size: 28,
+            ),
+            SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Restaurant is currently closed',
+                    style: TextStyle(
+                      color: Colors.redAccent,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
+                    ),
+                  ),
+                  SizedBox(height: 6),
+                  Text(
+                    'Please remove its items from your cart '
+                    'and choose another restaurant.',
+                    style: TextStyle(
+                      color: Colors.black87,
+                      height: 1.4,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    },
+  ),
 
                                 ...cartItems.map(
                                   (item) => CartItemCard(
@@ -1359,64 +1434,100 @@ class _CartScreenState extends State<CartScreen> {
                                 const SizedBox(
                                     height: 20),
 
-                                SizedBox(
-                                  width:
-                                      double.infinity,
-                                  height: 55,
-                                  child:
-                                      ElevatedButton(
-                                    onPressed:
-                                        restaurantId ==
-                                                    null ||
-                                                bill ==
-                                                    null ||
-                                                !hasDistance ||
-                                                !isServiceable ||
-                                                distanceLoading
-                                            ? null
-                                            : () {
-                                                _proceedToCheckout(
-                                                  context:
-                                                      context,
-                                                  couponApplied:
-                                                      effectiveCouponApplied,
-                                                  couponCode:
-                                                      effectiveCouponApplied
-                                                          ? appliedCoupon
-                                                          : null,
-                                                  couponDiscount:
-                                                      effectiveCouponDiscount,
-                                                  restaurantId:
-                                                      restaurantId,
-                                                  distanceKm:
-                                                      distanceKm,
-                                                );
-                                              },
-                                    style:
-                                        ElevatedButton
-                                            .styleFrom(
-                                      backgroundColor:
-                                          Colors
-                                              .deepPurple,
-                                      foregroundColor:
-                                          Colors.white,
-                                      disabledBackgroundColor:
-                                          Colors.grey
-                                              .shade400,
-                                    ),
-                                    child:
-                                        const Text(
-                                      "Proceed to Checkout",
-                                      style:
-                                          TextStyle(
-                                        fontSize: 16,
-                                        fontWeight:
-                                            FontWeight
-                                                .bold,
-                                      ),
-                                    ),
-                                  ),
-                                ),
+                                StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+  stream: restaurantId == null
+      ? null
+      : _restaurantStatusStream(restaurantId),
+  builder: (context, restaurantSnapshot) {
+    final restaurantData = restaurantSnapshot.data?.data();
+
+    final bool isRestaurantOpen =
+        restaurantSnapshot.hasData &&
+        !restaurantSnapshot.hasError &&
+        restaurantData != null &&
+        restaurantData['isOpen'] == true;
+
+    final bool canCheckRestaurantStatus =
+        restaurantId != null &&
+        restaurantSnapshot.hasData &&
+        !restaurantSnapshot.hasError &&
+        restaurantData != null;
+
+    return SizedBox(
+      width: double.infinity,
+      height: 55,
+      child: ElevatedButton(
+        onPressed:
+            !canCheckRestaurantStatus ||
+                    !isRestaurantOpen ||
+                    bill == null ||
+                    !hasDistance ||
+                    !isServiceable ||
+                    distanceLoading
+                ? null
+                : () async {
+                    try {
+                      final restaurantSnapshot =
+                          await FirebaseFirestore.instance
+                              .collection('restaurant_registrations')
+                              .doc(restaurantId)
+                              .get();
+
+                      final restaurantData =
+                          restaurantSnapshot.data();
+
+                      if (!context.mounted) return;
+
+                      if (restaurantData == null ||
+                          restaurantData['isOpen'] != true) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Restaurant is currently closed. Please remove its items from your cart.',
+                            ),
+                          ),
+                        );
+                        return;
+                      }
+
+                      _proceedToCheckout(
+                        context: context,
+                        couponApplied: effectiveCouponApplied,
+                        couponCode: effectiveCouponApplied
+                            ? appliedCoupon
+                            : null,
+                        couponDiscount: effectiveCouponDiscount,
+                        restaurantId: restaurantId,
+                        distanceKm: distanceKm,
+                      );
+                    } catch (e) {
+                      if (!context.mounted) return;
+
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'Unable to check restaurant status. Please try again.',
+                          ),
+                        ),
+                      );
+                    }
+                  },
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.deepPurple,
+          foregroundColor: Colors.white,
+          disabledBackgroundColor: Colors.grey.shade400,
+        ),
+        child: const Text(
+          "Proceed to Checkout",
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
+    );
+  },
+),
                               ],
                             ),
                           ),
