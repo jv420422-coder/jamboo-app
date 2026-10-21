@@ -23,7 +23,10 @@ workflows:
 
       - name: Build signed IPA
         script: |
-          flutter build ipa --release -t lib/main.dart
+          flutter build ios --release -t lib/main.dart
+          xcode-project build-ipa \
+            --workspace "$CM_BUILD_DIR/ios/Runner.xcworkspace" \
+            --scheme "Runner"
 
     artifacts:
       - build/ios/ipa/*.ipa
