@@ -1,23 +1,39 @@
 workflows:
   jamboo_customer_ios:
-    name: Jamboo Customer App - iOS Build
+    name: Jamboo Customer App - iOS App Store
     max_build_duration: 60
     instance_type: mac_mini_m2
+
+    integrations:
+      app_store_connect: Jamboo
 
     environment:
       flutter: stable
       xcode: latest
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.jamboofooddelivery.app
 
     scripts:
       - name: Get Flutter packages
         script: flutter pub get
 
-      - name: Build iOS without code signing
-        script: flutter build ios --release --no-codesign -t lib/main.dart
+      - name: Apply iOS code signing
+        script: xcode-project use-profiles
+
+      - name: Build signed IPA
+        script: |
+          flutter build ipa --release -t lib/main.dart
 
     artifacts:
-      - build/ios/iphoneos/*.app
+      - build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
+
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+        submit_to_app_store: false
 
   jamboo_customer_simulator:
     name: Jamboo Customer App - iOS Simulator Test
