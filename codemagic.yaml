@@ -24,7 +24,6 @@ scripts:
   - name: Build signed IPA
     script: |
       set -e
-
       flutter build ipa --release -t lib/main.dart
 
       echo "Checking generated IPA files..."
@@ -67,4 +66,3 @@ scripts:
 artifacts:
   - build/ios/iphonesimulator/*.app
   - /tmp/xcodebuild_logs/*.log
-  
