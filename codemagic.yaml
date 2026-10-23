@@ -1,57 +1,69 @@
 workflows:
-  jamboo_customer_ios:
-    name: Jamboo Customer App - iOS App Store
-    max_build_duration: 60
-    instance_type: mac_mini_m2
+jamboo_customer_ios:
+name: Jamboo Customer App - iOS App Store
+max_build_duration: 60
+instance_type: mac_mini_m2
 
-    integrations:
-      app_store_connect: Jamboo
+integrations:
+  app_store_connect: Jamboo
 
-    environment:
-      flutter: stable
-      xcode: latest
-      ios_signing:
-        distribution_type: app_store
-        bundle_identifier: com.jamboofooddelivery.app
+environment:
+  flutter: stable
+  xcode: latest
+  ios_signing:
+    distribution_type: app_store
+    bundle_identifier: com.jamboofooddelivery.app
 
-    scripts:
-      - name: Get Flutter packages
-        script: flutter pub get
+scripts:
+  - name: Get Flutter packages
+    script: flutter pub get
 
-      - name: Apply iOS code signing
-        script: xcode-project use-profiles
+  - name: Apply iOS code signing
+    script: xcode-project use-profiles
 
-      - name: Build signed IPA
-        script: |
-          flutter build ipa --release -t lib/main.dart
+  - name: Build signed IPA
+    script: |
+      set -e
 
-    artifacts:
-      - build/ios/ipa/*.ipa
-      - /tmp/xcodebuild_logs/*.log
-      - build/ios/archive/*.xcarchive/dSYMs/**/*.dSYM
+      flutter build ipa --release -t lib/main.dart
 
-    publishing:
-      app_store_connect:
-        auth: integration
-        submit_to_testflight: true
-        submit_to_app_store: false
+      echo "Checking generated IPA files..."
+      find build/ios -type f -name "*.ipa" -print
 
-  jamboo_customer_simulator:
-    name: Jamboo Customer App - iOS Simulator Test
-    max_build_duration: 60
-    instance_type: mac_mini_m2
+      if ! find build/ios/ipa -maxdepth 1 -type f -name "*.ipa" | grep -q '\.ipa$'; then
+        echo "ERROR: IPA file was not found in build/ios/ipa/"
+        exit 1
+      fi
 
-    environment:
-      flutter: stable
-      xcode: latest
+      echo "SUCCESS: IPA file generated successfully."
 
-    scripts:
-      - name: Get Flutter packages
-        script: flutter pub get
+artifacts:
+  - build/ios/ipa/*.ipa
+  - /tmp/xcodebuild_logs/*.log
+  - build/ios/archive/*.xcarchive/dSYMs/**/*.dSYM
 
-      - name: Build iOS Simulator App
-        script: flutter build ios --debug --simulator -t lib/main.dart
+publishing:
+  app_store_connect:
+    auth: integration
+    submit_to_testflight: true
+    submit_to_app_store: false
 
-    artifacts:
-      - build/ios/iphonesimulator/*.app
-      - /tmp/xcodebuild_logs/*.log
+jamboo_customer_simulator:
+name: Jamboo Customer App - iOS Simulator Test
+max_build_duration: 60
+instance_type: mac_mini_m2
+
+environment:
+  flutter: stable
+  xcode: latest
+
+scripts:
+  - name: Get Flutter packages
+    script: flutter pub get
+
+  - name: Build iOS Simulator App
+    script: flutter build ios --debug --simulator -t lib/main.dart
+
+artifacts:
+  - build/ios/iphonesimulator/*.app
+  - /tmp/xcodebuild_logs/*.log
