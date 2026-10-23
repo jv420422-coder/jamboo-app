@@ -41,6 +41,8 @@
 	<!-- Location permission: only while using the app -->
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Jamboo uses your location to help you select your delivery address and find nearby restaurants.</string>
+    <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+<string>Jamboo uses your location to support location-related delivery features.</string>
 
 	<key>UIApplicationSceneManifest</key>
 	<dict>
