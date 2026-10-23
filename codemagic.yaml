@@ -67,3 +67,4 @@ scripts:
 artifacts:
   - build/ios/iphonesimulator/*.app
   - /tmp/xcodebuild_logs/*.log
+  
