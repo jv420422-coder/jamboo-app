@@ -11,284 +11,324 @@ import 'splash/splash_controller.dart';
 
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(
-    RemoteMessage message) async {
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+RemoteMessage message,
+) async {
+await Firebase.initializeApp(
+options: DefaultFirebaseOptions.currentPlatform,
+);
 
-  print("Background Notification Received:");
-  print(message.notification?.title);
+debugPrint('Background Notification Received:');
+debugPrint(message.notification?.title);
 }
 
 Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+WidgetsFlutterBinding.ensureInitialized();
 
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+debugPrint('JAMBOO STARTUP: Flutter binding ready');
 
-  if (!kIsWeb) {
-    FirebaseMessaging.onBackgroundMessage(
-      firebaseMessagingBackgroundHandler,
-    );
+try {
+debugPrint('JAMBOO STARTUP: Firebase initialization started');
 
-    await FCMService.initialize();
-  }
+await Firebase.initializeApp(
+  options: DefaultFirebaseOptions.currentPlatform,
+).timeout(const Duration(seconds: 30));
 
-  runApp(const JambooApp());
+debugPrint('JAMBOO STARTUP: Firebase initialization completed');
 
-  // Internet check background me start hoga.
-  InternetService.instance.initialize();
+} catch (error, stackTrace) {
+debugPrint(
+'JAMBOO STARTUP: Firebase initialization failed: $error',
+);
+debugPrintStack(stackTrace: stackTrace);
+
+runApp(
+  const MaterialApp(
+    debugShowCheckedModeBanner: false,
+    home: Scaffold(
+      backgroundColor: Color(0xFF4A148C),
+      body: SafeArea(
+        child: Center(
+          child: Padding(
+            padding: EdgeInsets.all(24),
+            child: Text(
+              'Jamboo could not initialize. '
+              'Please restart the app and try again.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+              ),
+            ),
+          ),
+        ),
+      ),
+    ),
+  ),
+);
+
+return;
+
+}
+
+if (!kIsWeb) {
+FirebaseMessaging.onBackgroundMessage(
+firebaseMessagingBackgroundHandler,
+);
+}
+
+debugPrint('JAMBOO STARTUP: Starting Flutter UI');
+
+runApp(const JambooApp());
+
+debugPrint('JAMBOO STARTUP: Flutter UI started');
+
+if (!kIsWeb) {
+FCMService.initialize()
+.then((_) {
+debugPrint(
+'JAMBOO STARTUP: FCM initialization completed',
+);
+})
+.catchError(
+(Object error, StackTrace stackTrace) {
+debugPrint(
+'JAMBOO STARTUP: FCM initialization failed: $error',
+);
+debugPrintStack(stackTrace: stackTrace);
+},
+);
+}
+
+// Existing internet check remains unchanged.
+InternetService.instance.initialize();
 }
 
 class JambooApp extends StatelessWidget {
-  static final GlobalKey<NavigatorState> navigatorKey =
-    GlobalKey<NavigatorState>();
-  const JambooApp({super.key});
+static final GlobalKey<NavigatorState> navigatorKey =
+GlobalKey<NavigatorState>();
 
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-  navigatorKey: JambooApp.navigatorKey,
-  debugShowCheckedModeBanner: false,
-      title: "Jamboo",
+const JambooApp({super.key});
 
-      builder: (context, child) {
-        return ValueListenableBuilder<bool?>(
-          valueListenable: InternetService.instance.isOnline,
-
-          // IMPORTANT:
-          // MaterialApp ka actual app child yahan pass karna zaroori hai.
-          child: child,
-
-          builder: (
-            context,
-            isOnline,
-            currentChild,
-          ) {
-            // Internet status abhi check ho raha hai.
-            // Existing app normally show hoga.
-            if (isOnline == null) {
-              return currentChild ??
-                  const SizedBox.shrink();
-            }
-
-            // Internet available hai.
-            if (isOnline) {
-              return currentChild ??
-                  const SizedBox.shrink();
-            }
-
-            // Internet nahi hai.
-            return Stack(
-              children: [
-                if (currentChild != null)
-                  currentChild,
-
-                Positioned.fill(
-                  child: OfflineScreen(
-                    onTryAgain: () async {
-                      await InternetService
-                          .instance
-                          .checkNow();
-                    },
-                  ),
-                ),
-              ],
-            );
-          },
-        );
-      },
-
-      home: const SplashScreen(),
-    );
-  }
+@override
+Widget build(BuildContext context) {
+return MaterialApp(
+navigatorKey: JambooApp.navigatorKey,
+debugShowCheckedModeBanner: false,
+title: 'Jamboo',
+builder: (context, child) {
+return ValueListenableBuilder<bool?>(
+valueListenable: InternetService.instance.isOnline,
+child: child,
+builder: (
+context,
+isOnline,
+currentChild,
+) {
+if (isOnline == null) {
+return currentChild ?? const SizedBox.shrink();
 }
 
-class SplashScreen extends StatefulWidget {
-  const SplashScreen({super.key});
+        if (isOnline) {
+          return currentChild ?? const SizedBox.shrink();
+        }
 
-  @override
-  State<SplashScreen> createState() => _SplashScreenState();
-}
-
-class _SplashScreenState extends State<SplashScreen>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _loaderController;
-
-  @override
-  void initState() {
-    super.initState();
-
-    _loaderController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 900),
-    )..repeat();
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      SplashController.initialize(context);
-    });
-  }
-
-  @override
-  void dispose() {
-    _loaderController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: const SystemUiOverlayStyle(
-        statusBarColor: Colors.transparent,
-        systemNavigationBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.light,
-        systemNavigationBarIconBrightness: Brightness.light,
-      ),
-      child: Scaffold(
-        backgroundColor: const Color(0xFF4A148C),
-        body: Stack(
+        return Stack(
           children: [
+            if (currentChild != null) currentChild,
             Positioned.fill(
-              child: Image.asset(
-                "assets/images/splash_background.png",
-                fit: BoxFit.cover,
-              ),
-            ),
-
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 38,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  SizedBox(
-                    width: 170,
-                    height: 5,
-                    child: ClipRRect(
-                      borderRadius:
-                          BorderRadius.circular(10),
-                      child: AnimatedBuilder(
-                        animation: _loaderController,
-                        builder: (
-                          context,
-                          child,
-                        ) {
-                          return CustomPaint(
-                            painter:
-                                _SplashLoaderPainter(
-                              progress:
-                                  _loaderController.value,
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 14),
-
-                  const Text(
-                    "Getting things ready...",
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 17,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
+              child: OfflineScreen(
+                onTryAgain: () async {
+                  await InternetService.instance.checkNow();
+                },
               ),
             ),
           ],
-        ),
-      ),
+        );
+      },
     );
-  }
+  },
+  home: const SplashScreen(),
+);
+
+}
+}
+
+class SplashScreen extends StatefulWidget {
+const SplashScreen({super.key});
+
+@override
+State<SplashScreen> createState() => _SplashScreenState();
+}
+
+class _SplashScreenState extends State<SplashScreen>
+with SingleTickerProviderStateMixin {
+late AnimationController _loaderController;
+
+@override
+void initState() {
+super.initState();
+
+_loaderController = AnimationController(
+  vsync: this,
+  duration: const Duration(milliseconds: 900),
+)..repeat();
+
+WidgetsBinding.instance.addPostFrameCallback((_) {
+  SplashController.initialize(context);
+});
+
+}
+
+@override
+void dispose() {
+_loaderController.dispose();
+super.dispose();
+}
+
+@override
+Widget build(BuildContext context) {
+return AnnotatedRegion<SystemUiOverlayStyle>(
+value: const SystemUiOverlayStyle(
+statusBarColor: Colors.transparent,
+systemNavigationBarColor: Colors.transparent,
+statusBarIconBrightness: Brightness.light,
+systemNavigationBarIconBrightness: Brightness.light,
+),
+child: Scaffold(
+backgroundColor: const Color(0xFF4A148C),
+body: Stack(
+children: [
+Positioned.fill(
+child: Image.asset(
+'assets/images/splash_background.png',
+fit: BoxFit.cover,
+),
+),
+Positioned(
+left: 0,
+right: 0,
+bottom: 38,
+child: Column(
+mainAxisSize: MainAxisSize.min,
+children: [
+SizedBox(
+width: 170,
+height: 5,
+child: ClipRRect(
+borderRadius: BorderRadius.circular(10),
+child: AnimatedBuilder(
+animation: _loaderController,
+builder: (
+context,
+child,
+) {
+return CustomPaint(
+painter: _SplashLoaderPainter(
+progress: _loaderController.value,
+),
+);
+},
+),
+),
+),
+const SizedBox(height: 14),
+const Text(
+'Getting things ready...',
+style: TextStyle(
+color: Colors.white,
+fontSize: 17,
+fontWeight: FontWeight.w500,
+),
+),
+],
+),
+),
+],
+),
+),
+);
+}
 }
 
 class _SplashLoaderPainter extends CustomPainter {
-  final double progress;
+final double progress;
 
-  _SplashLoaderPainter({
-    required this.progress,
-  });
+_SplashLoaderPainter({
+required this.progress,
+});
 
-  @override
-  void paint(
-    Canvas canvas,
-    Size size,
-  ) {
-    final backgroundPaint = Paint()
-      ..color = Colors.white24
-      ..style = PaintingStyle.fill;
+@override
+void paint(
+Canvas canvas,
+Size size,
+) {
+final backgroundPaint = Paint()
+..color = Colors.white24
+..style = PaintingStyle.fill;
 
-    final progressPaint = Paint()
-      ..color = Colors.white
-      ..style = PaintingStyle.fill;
+final progressPaint = Paint()
+  ..color = Colors.white
+  ..style = PaintingStyle.fill;
 
-    final glowPaint = Paint()
-      ..color = Colors.white.withOpacity(0.35)
-      ..style = PaintingStyle.fill
-      ..maskFilter = const MaskFilter.blur(
-        BlurStyle.normal,
-        5,
-      );
+final glowPaint = Paint()
+  ..color = Colors.white.withOpacity(0.35)
+  ..style = PaintingStyle.fill
+  ..maskFilter = const MaskFilter.blur(
+    BlurStyle.normal,
+    5,
+  );
 
-    final backgroundRect =
-        RRect.fromRectAndRadius(
-      Offset.zero & size,
-      const Radius.circular(10),
-    );
+final backgroundRect = RRect.fromRectAndRadius(
+  Offset.zero & size,
+  const Radius.circular(10),
+);
 
-    canvas.drawRRect(
-      backgroundRect,
-      backgroundPaint,
-    );
+canvas.drawRRect(
+  backgroundRect,
+  backgroundPaint,
+);
 
-    const segmentWidth = 55.0;
+const segmentWidth = 55.0;
 
-    final startX =
-        (size.width + segmentWidth) * progress -
-        segmentWidth;
+final startX =
+    (size.width + segmentWidth) * progress - segmentWidth;
 
-    final glowRect =
-        RRect.fromRectAndRadius(
-      Rect.fromLTWH(
-        startX,
-        0,
-        segmentWidth,
-        size.height,
-      ),
-      const Radius.circular(10),
-    );
+final glowRect = RRect.fromRectAndRadius(
+  Rect.fromLTWH(
+    startX,
+    0,
+    segmentWidth,
+    size.height,
+  ),
+  const Radius.circular(10),
+);
 
-    canvas.drawRRect(
-      glowRect,
-      glowPaint,
-    );
+canvas.drawRRect(
+  glowRect,
+  glowPaint,
+);
 
-    final progressRect =
-        RRect.fromRectAndRadius(
-      Rect.fromLTWH(
-        startX,
-        0,
-        segmentWidth,
-        size.height,
-      ),
-      const Radius.circular(10),
-    );
+final progressRect = RRect.fromRectAndRadius(
+  Rect.fromLTWH(
+    startX,
+    0,
+    segmentWidth,
+    size.height,
+  ),
+  const Radius.circular(10),
+);
 
-    canvas.drawRRect(
-      progressRect,
-      progressPaint,
-    );
-  }
+canvas.drawRRect(
+  progressRect,
+  progressPaint,
+);
 
-  @override
-  bool shouldRepaint(
-    _SplashLoaderPainter oldDelegate,
-  ) {
-    return oldDelegate.progress != progress;
-  }
+}
+
+@override
+bool shouldRepaint(
+_SplashLoaderPainter oldDelegate,
+) {
+return oldDelegate.progress != progress;
+}
 }
