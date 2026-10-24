@@ -20,6 +20,9 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 
+	<key>ITSAppUsesNonExemptEncryption</key>
+    <false/>
+
 	<key>CFBundleName</key>
 	<string>jamboo</string>
 
@@ -37,6 +40,17 @@
 
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>CFBundleURLTypes</key>
+    <array>
+    <dict>
+        <key>CFBundleTypeRole</key>
+        <string>Editor</string>
+        <key>CFBundleURLSchemes</key>
+        <array>
+        <string>com.googleusercontent.apps.514105496890-qldsnr1390l7oktkui60q7pggi3g2qud</string>
+        </array>
+        </dict>
+        </array>
 
 	<!-- Location permission: only while using the app -->
 	<key>NSLocationWhenInUseUsageDescription</key>
