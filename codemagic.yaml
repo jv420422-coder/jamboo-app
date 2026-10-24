@@ -23,22 +23,14 @@ workflows:
 
       - name: Build signed IPA
         script: |
-          set -e
-          flutter build ipa --release -t lib/main.dart
+          flutter build ios --release -t lib/main.dart
+          xcode-project build-ipa \
+            --workspace "$CM_BUILD_DIR/ios/Runner.xcworkspace" \
+            --scheme "Runner"
 
-          echo "Checking generated IPA files..."
-          find build/ios -type f -name "*.ipa" -print
-
-          if ! find build/ios/ipa -maxdepth 1 -type f -name "*.ipa" | grep -q '\.ipa$'; then
-            echo "ERROR: IPA file was not found in build/ios/ipa/"
-            exit 1
-          fi
-
-          echo "SUCCESS: IPA file generated successfully."
     artifacts:
       - build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
-      - build/ios/archive/*.xcarchive/dSYMs/**/*.dSYM
 
     publishing:
       app_store_connect:

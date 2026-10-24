@@ -58,14 +58,14 @@ class DefaultFirebaseOptions {
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyA79pNGi0kajIMrDLzmXQ7Ivg7OLeJKfJE',
-    appId: '1:514105496890:ios:f157cf411505af8d1e2c03',
-    messagingSenderId: '514105496890',
-    projectId: 'jamboo-ee445',
-    storageBucket: 'jamboo-ee445.firebasestorage.app',
-    iosClientId: '514105496890-bgb83l5rb8df31hsg0ir8q88c76itb2s.apps.googleusercontent.com',
-    iosBundleId: 'com.example.jamboo',
-  );
+  apiKey: 'AIzaSyA79pNGi0kajIMrDLzmXQ7Ivg7OLeJKfJE',
+  appId: '1:514105496890:ios:a9352de5095522701e2c03',
+  messagingSenderId: '514105496890',
+  projectId: 'jamboo-ee445',
+  storageBucket: 'jamboo-ee445.firebasestorage.app',
+  iosClientId: '514105496890-qldsnr1390l7oktkui60q7pggi3g2qud.apps.googleusercontent.com',
+  iosBundleId: 'com.jamboofooddelivery.app',
+);
 
   static const FirebaseOptions macos = FirebaseOptions(
     apiKey: 'AIzaSyA79pNGi0kajIMrDLzmXQ7Ivg7OLeJKfJE',
