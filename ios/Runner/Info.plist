@@ -40,6 +40,20 @@
 
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+
+	<key>LSApplicationQueriesSchemes</key>
+<array>
+    <string>tez</string>
+    <string>phonepe</string>
+    <string>paytmmp</string>
+    <string>gpay</string>
+    <string>cred</string>
+    <string>bhim</string>
+    <string>amazonpay</string>
+    <string>mobikwik</string>
+    <string>freecharge</string>
+</array>
+
 	<key>CFBundleURLTypes</key>
     <array>
     <dict>
