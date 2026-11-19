@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 import '../models/cart_item_model.dart';
 import '../services/cart_service.dart';
+import 'login_screen.dart';
 
 class JambooAIScreen extends StatefulWidget {
   const JambooAIScreen({super.key});
@@ -24,7 +26,8 @@ class _JambooAIScreenState extends State<JambooAIScreen> {
     region: "asia-south1",
   );
 
-  final CartService _cartService = CartService();
+  // Guest user ke liye CartService initialize nahi hoga.
+  CartService? _cartService;
 
   final Set<String> _addingItems = {};
   final Set<String> _addedItems = {};
@@ -47,6 +50,70 @@ class _JambooAIScreenState extends State<JambooAIScreen> {
     },
   ];
 
+  @override
+  void initState() {
+    super.initState();
+
+    // Sirf logged-in user ke liye CartService initialize karo.
+    if (FirebaseAuth.instance.currentUser != null) {
+      _cartService = CartService();
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // LOGIN REQUIRED DIALOG
+  // ---------------------------------------------------------------------------
+
+  Future<void> _showLoginRequiredDialog() async {
+    final goToLogin = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text(
+            'Login Required',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          content: const Text(
+            'Please login first to add items to your cart.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context, false);
+              },
+              child: const Text('Maybe Later'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context, true);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.deepPurple,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Login'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (goToLogin == true && mounted) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => LoginScreen(),
+        ),
+      );
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // SCROLL
+  // ---------------------------------------------------------------------------
+
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!_scrollController.hasClients) {
@@ -60,6 +127,10 @@ class _JambooAIScreenState extends State<JambooAIScreen> {
       );
     });
   }
+
+  // ---------------------------------------------------------------------------
+  // PRELOAD RECOMMENDATION IMAGES
+  // ---------------------------------------------------------------------------
 
   Future<void> _preloadRecommendationImages(
     List<Map<String, dynamic>> recommendations,
@@ -84,6 +155,10 @@ class _JambooAIScreenState extends State<JambooAIScreen> {
       } catch (_) {}
     }
   }
+
+  // ---------------------------------------------------------------------------
+  // SEND MESSAGE
+  // ---------------------------------------------------------------------------
 
   Future<void> sendMessage() async {
     final message = _controller.text.trim();
@@ -199,9 +274,22 @@ class _JambooAIScreenState extends State<JambooAIScreen> {
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // ADD RECOMMENDATION TO CART
+  // ---------------------------------------------------------------------------
+
   Future<void> addRecommendationToCart(
     Map<String, dynamic> item,
   ) async {
+    // Guest user ko cart mein item add karne ki permission nahi hai.
+    // Pehle login karna hoga.
+    final cartService = _cartService;
+
+    if (cartService == null) {
+      await _showLoginRequiredDialog();
+      return;
+    }
+
     final itemId =
         (item["id"] ?? "").toString();
 
@@ -237,8 +325,7 @@ class _JambooAIScreenState extends State<JambooAIScreen> {
       );
 
       final added =
-          await _cartService
-              .addToCartWithRestaurantCheck(
+          await cartService.addToCartWithRestaurantCheck(
         cartItem,
       );
 
@@ -266,8 +353,7 @@ class _JambooAIScreenState extends State<JambooAIScreen> {
       }
 
       final previousRestaurantName =
-          await _cartService
-              .getCurrentRestaurantName();
+          await cartService.getCurrentRestaurantName();
 
       if (!mounted) {
         return;
@@ -327,9 +413,9 @@ class _JambooAIScreenState extends State<JambooAIScreen> {
       );
 
       if (replaceCart == true) {
-        await _cartService.clearCart();
+        await cartService.clearCart();
 
-        await _cartService.addToCart(
+        await cartService.addToCart(
           cartItem,
         );
 
@@ -378,6 +464,10 @@ class _JambooAIScreenState extends State<JambooAIScreen> {
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // SUGGESTION CHIP
+  // ---------------------------------------------------------------------------
+
   Widget suggestionChip(String text) {
     return InkWell(
       borderRadius:
@@ -424,6 +514,10 @@ class _JambooAIScreenState extends State<JambooAIScreen> {
       ),
     );
   }
+
+  // ---------------------------------------------------------------------------
+  // RECOMMENDATION CARD
+  // ---------------------------------------------------------------------------
 
   Widget recommendationCard(
     Map<String, dynamic> item,
@@ -665,12 +759,20 @@ class _JambooAIScreenState extends State<JambooAIScreen> {
     );
   }
 
+  // ---------------------------------------------------------------------------
+  // DISPOSE
+  // ---------------------------------------------------------------------------
+
   @override
   void dispose() {
     _controller.dispose();
     _scrollController.dispose();
     super.dispose();
   }
+
+  // ---------------------------------------------------------------------------
+  // BUILD
+  // ---------------------------------------------------------------------------
 
   @override
   Widget build(

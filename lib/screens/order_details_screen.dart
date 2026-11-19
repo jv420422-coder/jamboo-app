@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../models/order_model.dart';
 import '../services/cart_service.dart';
@@ -39,6 +41,75 @@ class _OrderDetailsScreenState
 
   bool _isReordering = false;
 
+Future<void> _callRestaurant(String restaurantId) async {
+  try {
+    final id = restaurantId.trim();
+
+    if (id.isEmpty) {
+      throw Exception("Restaurant information not found.");
+    }
+
+    final snapshot = await FirebaseFirestore.instance
+        .collection("restaurant_registrations")
+        .doc(id)
+        .get();
+
+    if (!mounted) return;
+
+    if (!snapshot.exists) {
+      throw Exception("Restaurant details not found.");
+    }
+
+    final data = snapshot.data();
+
+    String phone = data?["mobileNumber"]?.toString().trim() ?? "";
+
+    if (phone.isEmpty) {
+      throw Exception("Restaurant phone number is unavailable.");
+    }
+
+    // Normalize Indian mobile numbers.
+    phone = phone.replaceAll(RegExp(r'[\s()-]'), '');
+
+    if (phone.startsWith("0") && phone.length == 11) {
+      phone = phone.substring(1);
+    }
+
+    if (phone.startsWith("+")) {
+      // Already contains country code.
+    } else if (phone.length == 10) {
+      phone = "+91$phone";
+    } else if (phone.length == 12 && phone.startsWith("91")) {
+      phone = "+$phone";
+    } else {
+      throw Exception("Invalid restaurant phone number.");
+    }
+
+    final uri = Uri(
+      scheme: "tel",
+      path: phone,
+    );
+
+    final launched = await launchUrl(
+      uri,
+      mode: LaunchMode.externalApplication,
+    );
+
+    if (!launched && mounted) {
+      throw Exception("Unable to open phone dialer.");
+    }
+  } catch (e) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          e.toString().replaceFirst("Exception: ", ""),
+        ),
+      ),
+    );
+  }
+}
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -260,15 +331,8 @@ class _OrderDetailsScreenState
                       order.vehicleNumber,
 
                   onCallRestaurant: () {
-                    ScaffoldMessenger.of(context)
-                        .showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                          "Restaurant calling will be added soon",
-                        ),
-                      ),
-                    );
-                  },
+  _callRestaurant(order.restaurantId);
+},
 
                   onCallRider: () {
                     ScaffoldMessenger.of(context)

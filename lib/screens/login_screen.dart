@@ -482,6 +482,47 @@ const SizedBox(height: 24),
                 ),
 
                 const SizedBox(height: 28),
+                // ------------------------------------------------
+// CONTINUE AS GUEST
+// ------------------------------------------------
+
+SizedBox(
+  width: double.infinity,
+  height: 56,
+  child: OutlinedButton.icon(
+    onPressed: () {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) =>
+              const HomeScreen(),
+        ),
+      );
+    },
+    icon: const Icon(
+      Icons.person_outline_rounded,
+      color: Color(0xFF7040C4),
+    ),
+    label: const Text(
+      "Continue as Guest",
+      style: TextStyle(
+        color: Color(0xFF7040C4),
+        fontSize: 16,
+        fontWeight: FontWeight.w600,
+      ),
+    ),
+    style: OutlinedButton.styleFrom(
+      side: const BorderSide(
+        color: Color(0xFF7040C4),
+      ),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+      ),
+    ),
+  ),
+),
+
+const SizedBox(height: 14),
 
                 // ------------------------------------------------
                 // SECURITY

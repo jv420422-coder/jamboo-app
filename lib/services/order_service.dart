@@ -77,22 +77,6 @@ class OrderService {
       'paymentIntentId':
           paymentIntentId,
     });
-
-    await OrderNotificationService.orderPlaced(
-      userId:
-          order.userId,
-      orderId:
-          order.orderId,
-    );
-
-    await OrderNotificationService.restaurantNewOrder(
-      restaurantId:
-          order.restaurantId,
-      orderId:
-          order.orderId,
-      orderNumber:
-          order.orderNumber,
-    );
   }
 
   // ============================================================

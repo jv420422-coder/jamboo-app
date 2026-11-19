@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 import '../services/cart_service.dart';
 
@@ -14,7 +15,11 @@ class BottomNavbar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final CartService cartService = CartService();
+    // Guest user ke liye CartService initialize nahi hoga.
+    final user = FirebaseAuth.instance.currentUser;
+
+    final CartService? cartService =
+        user != null ? CartService() : null;
 
     return BottomNavigationBar(
       currentIndex: currentIndex,
@@ -38,65 +43,69 @@ class BottomNavbar extends StatelessWidget {
         ),
 
         BottomNavigationBarItem(
-          icon: StreamBuilder<int>(
-            stream: cartService.totalItems(),
-            builder: (context, snapshot) {
-              final int count = snapshot.data ?? 0;
+          icon: cartService != null
+              ? StreamBuilder<int>(
+                  stream: cartService.totalItems(),
+                  builder: (context, snapshot) {
+                    final int count = snapshot.data ?? 0;
 
-              return Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  const Icon(
-                    Icons.shopping_cart_outlined,
-                  ),
+                    return Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        const Icon(
+                          Icons.shopping_cart_outlined,
+                        ),
 
-                  if (count > 0)
-                    Positioned(
-                      right: -8,
-                      top: -8,
-                      child: Container(
-                        padding:
-                            const EdgeInsets.symmetric(
-                          horizontal: 5,
-                          vertical: 2,
-                        ),
-                        constraints:
-                            const BoxConstraints(
-                          minWidth: 18,
-                          minHeight: 18,
-                        ),
-                        decoration:
-                            BoxDecoration(
-                          color: Colors.red,
-                          borderRadius:
-                              BorderRadius.circular(
-                            10,
+                        if (count > 0)
+                          Positioned(
+                            right: -8,
+                            top: -8,
+                            child: Container(
+                              padding:
+                                  const EdgeInsets.symmetric(
+                                horizontal: 5,
+                                vertical: 2,
+                              ),
+                              constraints:
+                                  const BoxConstraints(
+                                minWidth: 18,
+                                minHeight: 18,
+                              ),
+                              decoration:
+                                  BoxDecoration(
+                                color: Colors.red,
+                                borderRadius:
+                                    BorderRadius.circular(
+                                  10,
+                                ),
+                                border: Border.all(
+                                  color: Colors.white,
+                                  width: 1.5,
+                                ),
+                              ),
+                              child: Text(
+                                count > 99
+                                    ? "99+"
+                                    : count.toString(),
+                                textAlign:
+                                    TextAlign.center,
+                                style:
+                                    const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight:
+                                      FontWeight.bold,
+                                ),
+                              ),
+                            ),
                           ),
-                          border: Border.all(
-                            color: Colors.white,
-                            width: 1.5,
-                          ),
-                        ),
-                        child: Text(
-                          count > 99
-                              ? "99+"
-                              : count.toString(),
-                          textAlign:
-                              TextAlign.center,
-                          style:
-                              const TextStyle(
-                            color: Colors.white,
-                            fontSize: 10,
-                            fontWeight:
-                                FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-              );
-            },
-          ),
+                      ],
+                    );
+                  },
+                )
+              : const Icon(
+                  Icons.shopping_cart_outlined,
+                ),
           label: "Cart",
         ),
 

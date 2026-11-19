@@ -26,6 +26,7 @@ import 'under_199_screen.dart';
 import 'location_unavailable_screen.dart';
 import 'out_of_service_screen.dart';
 import 'saved_addresses_screen.dart';
+import 'login_screen.dart';
 
 class HomeScreen extends StatefulWidget {
 const HomeScreen({super.key});
@@ -53,6 +54,7 @@ bool _isRefreshing = false;
 // Customer ki selected location ke coordinates.
 double? _customerLatitude;
 double? _customerLongitude;
+String? _currentAddress;
 
 // Location-related screen states.
 bool _locationUnavailable = false;
@@ -123,6 +125,51 @@ WidgetsBinding.instance.addPostFrameCallback((_) {
 
 _scrollController.addListener(_handleScroll);
 
+}
+Future<void> _showLoginRequiredDialog() async {
+  final goToLogin = await showDialog<bool>(
+    context: context,
+    builder: (context) {
+      return AlertDialog(
+        title: const Text(
+          'Login Required',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        content: const Text(
+          'Please login first to access this feature.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context, false);
+            },
+            child: const Text('Maybe Later'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context, true);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.deepPurple,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Login'),
+          ),
+        ],
+      );
+    },
+  );
+
+  if (goToLogin == true && mounted) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => LoginScreen(),
+      ),
+    );
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -259,122 +306,117 @@ if (shouldShow != showAIPopup &&
 // ---------------------------------------------------------------------------
 
 Future<void> _updateCurrentLocation({
-  bool showLoading = true,
+bool showLoading = true,
 }) async {
-  final user = FirebaseAuth.instance.currentUser;
+final user = FirebaseAuth.instance.currentUser;
 
-  if (user == null) {
-    if (!mounted) return;
+if (mounted && showLoading) {
+setState(() {
+_locationChecking = true;
+});
+}
 
-    setState(() {
-      _locationChecking = false;
-      _locationUnavailable = true;
-      _serviceabilityLoading = false;
-    });
+try {
+final permissionReady =
+await _locationService.ensureLocationPermission();
 
-    return;
-  }
+if (!permissionReady) {
+  if (!mounted) return;
 
-  if (mounted && showLoading) {
   setState(() {
-    _locationChecking = true;
+    _locationChecking = false;
+    _locationUnavailable = true;
+    _serviceabilityLoading = false;
+  });
+
+  return;
+}
+
+final position =
+    await _locationService.getCurrentPosition();
+
+if (position == null) {
+  if (!mounted) return;
+
+  setState(() {
+    _locationChecking = false;
+    _locationUnavailable = true;
+    _serviceabilityLoading = false;
+  });
+
+  return;
+}
+
+if (!mounted) return;
+
+setState(() {
+  _customerLatitude = position.latitude;
+  _customerLongitude = position.longitude;
+
+  _locationUnavailable = false;
+  _locationChecking = false;
+  _outOfService = false;
+  _serviceabilityFailed = false;
+  _serviceabilityLoading = true;
+});
+
+if (_restaurantsLoaded) {
+  await _updateServiceableRestaurants(
+    _restaurantDocs,
+  );
+}
+
+try {
+  final address =
+      await _locationService.getAddressFromCoordinates(
+    position.latitude,
+    position.longitude,
+  );
+  if (mounted && address != null && address.isNotEmpty) {
+  setState(() {
+    _currentAddress = address;
   });
 }
 
-  try {
-    final permissionReady =
-        await _locationService.ensureLocationPermission();
-
-    if (!permissionReady) {
-      if (!mounted) return;
-
-      setState(() {
-        _locationChecking = false;
-        _locationUnavailable = true;
-        _serviceabilityLoading = false;
-      });
-
-      return;
-    }
-
-    final position =
-        await _locationService.getCurrentPosition();
-
-    if (position == null) {
-      if (!mounted) return;
-
-      setState(() {
-        _locationChecking = false;
-        _locationUnavailable = true;
-        _serviceabilityLoading = false;
-      });
-
-      return;
-    }
-
-    if (!mounted) return;
-
-    setState(() {
-
-      _customerLatitude = position.latitude;
-      _customerLongitude = position.longitude;
-
-      _locationUnavailable = false;
-      _locationChecking = false;
-      _outOfService = false;
-      _serviceabilityFailed = false;
-      _serviceabilityLoading = true;
-    });
-
-    // Restaurant stream load ho chuka hai toh serviceability check karo.
-    if (_restaurantsLoaded) {
-      await _updateServiceableRestaurants(
-        _restaurantDocs,
-      );
-    }
-
-    try {
-      final address =
-          await _locationService.getAddressFromCoordinates(
-        position.latitude,
-        position.longitude,
-      );
-
-      if (address != null && address.isNotEmpty) {
-        await FirebaseFirestore.instance
-            .collection('users')
-            .doc(user.uid)
-            .set(
-          {
-            'currentLatitude': position.latitude,
-            'currentLongitude': position.longitude,
-            'currentAddress': address,
-            'updatedAt': FieldValue.serverTimestamp(),
-          },
-          SetOptions(merge: true),
-        );
-      }
-
-      debugPrint(
-        'CURRENT LOCATION: '
-        '${position.latitude}, ${position.longitude}',
-      );
-    } catch (e) {
-      debugPrint(
-        'CUSTOMER LOCATION ADDRESS UPDATE ERROR: $e',
-      );
-    }
-  } catch (e) {
-    debugPrint('CUSTOMER LOCATION ERROR: $e');
-
-    if (!mounted) return;
-
-    setState(() {
-      _locationChecking = false;
-      _locationUnavailable = true;
-      _serviceabilityLoading = false;
-    });
+  if (user != null &&
+      address != null &&
+      address.isNotEmpty) {
+    await FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .set(
+      {
+        'currentLatitude': position.latitude,
+        'currentLongitude': position.longitude,
+        'currentAddress': address,
+        'updatedAt': FieldValue.serverTimestamp(),
+      },
+      SetOptions(merge: true),
+    );
   }
+
+  debugPrint(
+    'CURRENT LOCATION: '
+    '${position.latitude}, ${position.longitude}',
+  );
+} catch (e) {
+  debugPrint(
+    'CUSTOMER LOCATION ADDRESS UPDATE ERROR: $e',
+  );
+}
+
+} catch (e) {
+debugPrint('CUSTOMER LOCATION ERROR: $e');
+
+if (!mounted) return;
+
+setState(() {
+  _locationChecking = false;
+  _locationUnavailable = true;
+  _serviceabilityLoading = false;
+});
+
+}
 }
 // ---------------------------------------------------------------------------
 // HOME SCREEN REFRESH
@@ -1797,7 +1839,14 @@ crossAxisAlignment:
 CrossAxisAlignment
 .start,
 children: [
-const HeaderWidget(),
+HeaderWidget(
+  currentAddress: _currentAddress,
+  onLocationTap: () {
+    if (FirebaseAuth.instance.currentUser != null) {
+      _chooseSavedAddress();
+    }
+  },
+),
 
 const SizedBox(  
                 height: 4,  
@@ -2065,45 +2114,46 @@ const SizedBox(
         : BottomNavbar(
     currentIndex:  
         selectedIndex,  
-    onTap: (index) {  
-      setState(() {  
-        selectedIndex =  
-            index;  
-      });  
+    onTap: (index) async {
 
-      if (index == 1) {  
-        Navigator.push(  
-          context,  
-          MaterialPageRoute(  
-            builder:  
-                (context) =>  
-                    const Under199Screen(),  
-          ),  
-        );  
-      }  
+  // Cart aur Profile ke liye login required hai.
+  if ((index == 2 || index == 3) &&
+      FirebaseAuth.instance.currentUser == null) {
+    await _showLoginRequiredDialog();
+    return;
+  }
 
-      if (index == 2) {  
-        Navigator.push(  
-          context,  
-          MaterialPageRoute(  
-            builder:  
-                (context) =>  
-                    const CartScreen(),  
-          ),  
-        );  
-      }  
+  setState(() {
+    selectedIndex = index;
+  });
 
-      if (index == 3) {  
-        Navigator.push(  
-          context,  
-          MaterialPageRoute(  
-            builder:  
-                (context) =>  
-                    const ProfileScreen(),  
-          ),  
-        );  
-      }  
-    },  
+  if (index == 1) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const Under199Screen(),
+      ),
+    );
+  }
+
+  if (index == 2) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const CartScreen(),
+      ),
+    );
+  }
+
+  if (index == 3) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const ProfileScreen(),
+      ),
+    );
+  }
+},
   ),  
 );
 

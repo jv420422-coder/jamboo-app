@@ -1,8 +1,10 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 import 'cart/cart_screen.dart';
+import 'login_screen.dart';
 import '../models/cart_item_model.dart';
 import '../services/cart_service.dart';
 
@@ -25,7 +27,7 @@ class _RestaurantDetailsScreenState
     extends State<RestaurantDetailsScreen> {
   String selectedFilter = "all";
 
-  final CartService cartService = CartService();
+  CartService? cartService;
 
   late final Stream<DocumentSnapshot<Map<String, dynamic>>>
       _restaurantStream;
@@ -35,30 +37,36 @@ class _RestaurantDetailsScreenState
   late final Stream<QuerySnapshot> _cartStream;
 
   @override
-  void initState() {
-    super.initState();
+void initState() {
+  super.initState();
 
-    _restaurantStream = FirebaseFirestore.instance
-        .collection("restaurant_registrations")
-        .doc(widget.restaurantId)
-        .snapshots();
+  _restaurantStream = FirebaseFirestore.instance
+      .collection("restaurant_registrations")
+      .doc(widget.restaurantId)
+      .snapshots();
 
-    _menuStream = FirebaseFirestore.instance
-        .collection('menu_items')
-        .where(
-          'restaurantId',
-          isEqualTo: widget.restaurantId,
-        )
-        .snapshots();
+  _menuStream = FirebaseFirestore.instance
+      .collection('menu_items')
+      .where(
+        'restaurantId',
+        isEqualTo: widget.restaurantId,
+      )
+      .snapshots();
 
-    _cartStream = cartService.cartStream();
-  }
+  // Guest ke liye CartService initialize nahi hoga.
+  if (FirebaseAuth.instance.currentUser != null) {
+  cartService = CartService();
+  _cartStream = cartService!.cartStream();
+} else {
+  _cartStream = const Stream<QuerySnapshot>.empty();
+}
+}
 
-  Stream<int> get totalItems =>
-      cartService.totalItems();
+  Stream<int>? get totalItems =>
+    cartService?.totalItems();
 
-  Stream<double> get totalPrice =>
-      cartService.totalPrice();
+Stream<double>? get totalPrice =>
+    cartService?.totalPrice();
 
   List<QueryDocumentSnapshot> _filterMenuItems(
     List<QueryDocumentSnapshot> docs,
@@ -115,6 +123,51 @@ class _RestaurantDetailsScreenState
         return docs;
     }
   }
+  Future<void> _showLoginRequiredDialog() async {
+  final goToLogin = await showDialog<bool>(
+    context: context,
+    builder: (context) {
+      return AlertDialog(
+        title: const Text(
+          'Login Required',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        content: const Text(
+          'Please login first to add items to your cart.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context, false);
+            },
+            child: const Text('Maybe Later'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context, true);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.deepPurple,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Login'),
+          ),
+        ],
+      );
+    },
+  );
+
+  if (goToLogin == true && mounted) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => LoginScreen(),
+      ),
+    );
+  }
+}
 
   Future<void> _addItemToCart({
     required String itemId,
@@ -126,6 +179,18 @@ class _RestaurantDetailsScreenState
     required int preparationTime,
     required bool isRestaurantOpen,
   }) async {
+    // Guest user cart mein item add nahi kar sakta.
+if (FirebaseAuth.instance.currentUser == null) {
+  await _showLoginRequiredDialog();
+  return;
+}
+
+final service = cartService;
+
+if (service == null) {
+  await _showLoginRequiredDialog();
+  return;
+}
     if (!isRestaurantOpen) {
       return;
     }
@@ -146,77 +211,75 @@ class _RestaurantDetailsScreenState
     );
 
     final added =
-        await cartService.addToCartWithRestaurantCheck(
-      item,
-    );
+    await service.addToCartWithRestaurantCheck(
+  item,
+);
 
-    if (added) {
-      return;
-    }
+if (added) {
+  return;
+}
 
-    if (!mounted) return;
+if (!mounted) return;
 
-    final previousRestaurantName =
-        await cartService.getCurrentRestaurantName();
+final previousRestaurantName =
+    await service.getCurrentRestaurantName();
 
-    if (!mounted) return;
+if (!mounted) return;
 
-    final replaceCart =
-        await showDialog<bool>(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text(
-            "Replace cart?",
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-            ),
+final replaceCart =
+    await showDialog<bool>(
+  context: context,
+  builder: (context) {
+    return AlertDialog(
+      title: const Text(
+        "Replace cart?",
+        style: TextStyle(
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+      content: Text(
+        "Your cart contains items from "
+        "${previousRestaurantName ?? "another restaurant"}.\n\n"
+        "Do you want to remove those items and "
+        "add this item from "
+        "${widget.restaurantName}?",
+      ),
+      actions: [
+        TextButton(
+          onPressed: () {
+            Navigator.pop(
+              context,
+              false,
+            );
+          },
+          child: const Text(
+            "Keep Cart",
           ),
-          content: Text(
-            "Your cart contains items from "
-            "${previousRestaurantName ?? "another restaurant"}.\n\n"
-            "Do you want to remove those items and "
-            "add this item from "
-            "${widget.restaurantName}?",
+        ),
+        ElevatedButton(
+          onPressed: () {
+            Navigator.pop(
+              context,
+              true,
+            );
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.deepPurple,
+            foregroundColor: Colors.white,
           ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(
-                  context,
-                  false,
-                );
-              },
-              child: const Text(
-                "Keep Cart",
-              ),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(
-                  context,
-                  true,
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor:
-                    Colors.deepPurple,
-                foregroundColor:
-                    Colors.white,
-              ),
-              child: const Text(
-                "Replace Cart",
-              ),
-            ),
-          ],
-        );
-      },
+          child: const Text(
+            "Replace Cart",
+          ),
+        ),
+      ],
     );
+  },
+);
 
-    if (replaceCart == true) {
-      await cartService.clearCart();
-      await cartService.addToCart(item);
-    }
+if (replaceCart == true) {
+  await service.clearCart();
+  await service.addToCart(item);
+}
   }
 
   @override
@@ -283,75 +346,59 @@ class _RestaurantDetailsScreenState
           backgroundColor:
               const Color(0xFFF5F0FF),
 
-          bottomNavigationBar:
-              StreamBuilder<int>(
-            stream: totalItems,
-            builder:
-                (context, itemSnapshot) {
-              return StreamBuilder<double>(
-                stream: totalPrice,
-                builder:
-                    (context, priceSnapshot) {
-                  final items =
-                      itemSnapshot.data ?? 0;
+          bottomNavigationBar: cartService == null
+    ? null
+    : StreamBuilder<int>(
+        stream: totalItems!,
+        builder: (context, itemSnapshot) {
+          return StreamBuilder<double>(
+            stream: totalPrice!,
+            builder: (context, priceSnapshot) {
+              final items = itemSnapshot.data ?? 0;
+              final total = priceSnapshot.data ?? 0;
 
-                  final total =
-                      priceSnapshot.data ?? 0;
+              if (items == 0) {
+                return const SizedBox();
+              }
 
-                  if (items == 0) {
-                    return const SizedBox();
-                  }
-
-                  return Container(
-                    padding:
-                        const EdgeInsets.all(16),
-                    decoration:
-                        const BoxDecoration(
-                      color: Colors.deepPurple,
+              return Container(
+                padding: const EdgeInsets.all(16),
+                decoration: const BoxDecoration(
+                  color: Colors.deepPurple,
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      "🛒 $items Items | ₹${total.toStringAsFixed(0)}",
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
                     ),
-                    child: Row(
-                      mainAxisAlignment:
-                          MainAxisAlignment
-                              .spaceBetween,
-                      children: [
-                        Text(
-                          "🛒 $items Items | ₹${total.toStringAsFixed(0)}",
-                          style:
-                              const TextStyle(
-                            color: Colors.white,
-                            fontWeight:
-                                FontWeight.bold,
-                            fontSize: 16,
+                    ElevatedButton(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const CartScreen(),
                           ),
-                        ),
-                        ElevatedButton(
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) =>
-                                    const CartScreen(),
-                              ),
-                            );
-                          },
-                          style:
-                              ElevatedButton.styleFrom(
-                            backgroundColor:
-                                Colors.white,
-                            foregroundColor:
-                                Colors.deepPurple,
-                          ),
-                          child: const Text(
-                            "View Cart",
-                          ),
-                        ),
-                      ],
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: Colors.deepPurple,
+                      ),
+                      child: const Text("View Cart"),
                     ),
-                  );
-                },
+                  ],
+                ),
               );
             },
-          ),
+          );
+        },
+      ),
 
           body: SingleChildScrollView(
             child: Column(
@@ -1122,10 +1169,10 @@ class _RestaurantDetailsScreenState
                           IconButton(
                             onPressed:
                                 () async {
-                              await cartService
-                                  .decreaseQty(
-                                itemId,
-                              );
+                              await cartService!
+    .decreaseQty(
+  itemId,
+);
                             },
                             icon:
                                 const Icon(
@@ -1152,10 +1199,10 @@ class _RestaurantDetailsScreenState
                           IconButton(
                             onPressed:
                                 () async {
-                              await cartService
-                                  .increaseQty(
-                                itemId,
-                              );
+                              await cartService!
+    .increaseQty(
+  itemId,
+);
                             },
                             icon:
                                 const Icon(
